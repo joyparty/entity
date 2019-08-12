@@ -39,6 +39,8 @@ func loadCache(entity Cacheable) (bool, error) {
 	data, err := opt.Cacher.Get(opt.Key)
 	if err != nil {
 		return false, errors.WithStack(err)
+	} else if data == nil {
+		return false, nil
 	}
 
 	if len(opt.AutoDecode) > 0 {
