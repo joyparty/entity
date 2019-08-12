@@ -9,7 +9,7 @@ import (
 
 // Cacheable 可缓存实体对象接口
 type Cacheable interface {
-	CacheOption() CacheOption
+	CacheOption() *CacheOption
 }
 
 // Cacher 缓存数据存储接口
@@ -99,7 +99,7 @@ func getCacheOption(entity Cacheable) (*CacheOption, error) {
 		opt.Expiration = 5 * time.Minute
 	}
 
-	return &opt, nil
+	return opt, nil
 }
 
 func autoDecode(data []byte, keys []string) ([]byte, error) {
