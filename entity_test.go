@@ -25,8 +25,8 @@ func TestMetadata(t *testing.T) {
 		t.Fatalf(`GenernalEntity metadata primary key, Expected=1, Actual=%d`, n)
 	} else if n := len(md.Columns); n != 5 {
 		t.Fatalf(`GenernalEntity metadata columns, Expected=4, Actual=%d`, n)
-	} else if v := (&GenernalEntity{}).Tablename(); md.Tablename != v {
-		t.Fatalf(`GenernalEntity metadata tablename, Expected=%q, Actual=%q`, v, md.Tablename)
+	} else if v := (&GenernalEntity{}).TableName(); md.TableName != v {
+		t.Fatalf(`GenernalEntity metadata tablename, Expected=%q, Actual=%q`, v, md.TableName)
 	}
 }
 
@@ -82,7 +82,7 @@ type GenernalEntity struct {
 	ImplicitIgnore bool
 }
 
-func (ge GenernalEntity) Tablename() string {
+func (ge GenernalEntity) TableName() string {
 	return "genernal"
 }
 
@@ -95,7 +95,7 @@ type EmptyEntity struct {
 	Name string
 }
 
-func (ee EmptyEntity) Tablename() string {
+func (ee EmptyEntity) TableName() string {
 	return "emtpy"
 }
 
@@ -108,7 +108,7 @@ type NoPrimaryKeyEntity struct {
 	Name string `db:"name"`
 }
 
-func (npe NoPrimaryKeyEntity) Tablename() string {
+func (npe NoPrimaryKeyEntity) TableName() string {
 	return "no_primary_key"
 }
 

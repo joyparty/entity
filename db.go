@@ -297,7 +297,7 @@ func delete(ctx context.Context, entity Entity, db DB) error {
 }
 
 func selectStatement(entity Entity, md *Metadata, dia *dialect) string {
-	stmt := fmt.Sprintf("SELECT * FROM %s WHERE", md.Tablename)
+	stmt := fmt.Sprintf("SELECT * FROM %s WHERE", md.TableName)
 	for i, col := range md.PrimaryKeys {
 		if i == 0 {
 			stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, dia), col.DBField)
@@ -331,7 +331,7 @@ func insertStatement(entity Entity, md *Metadata, dia *dialect) string {
 
 	stmt := fmt.Sprintf(
 		"INSERT INTO %s (%s) VALUES (%s)",
-		md.Tablename,
+		md.TableName,
 		strings.Join(columns, ", "),
 		strings.Join(placeholder, ", "),
 	)
@@ -345,7 +345,7 @@ func insertStatement(entity Entity, md *Metadata, dia *dialect) string {
 
 func updateStatement(entity Entity, md *Metadata, dia *dialect) string {
 	returnings := []string{}
-	stmt := fmt.Sprintf("UPDATE %s SET", md.Tablename)
+	stmt := fmt.Sprintf("UPDATE %s SET", md.TableName)
 
 	set := false
 	for _, col := range md.Columns {
@@ -381,7 +381,7 @@ func updateStatement(entity Entity, md *Metadata, dia *dialect) string {
 }
 
 func deleteStatement(entity Entity, md *Metadata, dia *dialect) string {
-	stmt := fmt.Sprintf("DELETE FROM %s WHERE", md.Tablename)
+	stmt := fmt.Sprintf("DELETE FROM %s WHERE", md.TableName)
 	for i, col := range md.PrimaryKeys {
 		if i == 0 {
 			stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, dia), col.DBField)

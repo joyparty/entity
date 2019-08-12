@@ -40,7 +40,7 @@ type Event int
 
 // Entity 实体对象接口
 type Entity interface {
-	Tablename() string
+	TableName() string
 	OnEntityEvent(ev Event) error
 }
 
@@ -57,7 +57,7 @@ type Column struct {
 // Metadata 元数据
 type Metadata struct {
 	ID          string
-	Tablename   string
+	TableName   string
 	Columns     []Column
 	PrimaryKeys []Column
 }
@@ -67,7 +67,7 @@ func NewMetadata(entity Entity) (*Metadata, error) {
 	id := entityID(entity)
 	md := &Metadata{
 		ID:          id,
-		Tablename:   entity.Tablename(),
+		TableName:   entity.TableName(),
 		Columns:     getColumns(entity),
 		PrimaryKeys: []Column{},
 	}

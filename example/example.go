@@ -1,4 +1,4 @@
-package example
+package main
 
 import (
 	"context"
@@ -26,6 +26,8 @@ var (
 // 	entity.WriteTimeout = 5 * time.Second
 // }
 
+func main() {}
+
 // User 用户实体
 type User struct {
 	ID       int64 `db:"user_id" entity:"primaryKey,autoIncrement"`
@@ -34,8 +36,8 @@ type User struct {
 	Other    bool  `db:"other" entity:"deprecated"`
 }
 
-// Tablename 返回数据库表名，entity.Entity接口方法
-func (u User) Tablename() string {
+// TableName 返回数据库表名，entity.Entity接口方法
+func (u User) TableName() string {
 	return "users"
 }
 
