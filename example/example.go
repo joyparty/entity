@@ -14,9 +14,17 @@ var (
 
 	_ entity.Cacher = &fakeCacher{}
 
+	// User可缓存断言
 	_ entity.Cacheable = (*User)(nil)
-	_ entity.Entity    = (*User)(nil)
+	// User是一个实体对象断言
+	_ entity.Entity = (*User)(nil)
 )
+
+// func init() {
+// 	// 设置entity模块读写超时时间，默认都是3秒
+// 	entity.ReadTimeout = 5 * time.Second
+// 	entity.WriteTimeout = 5 * time.Second
+// }
 
 // User 用户实体
 type User struct {
@@ -26,12 +34,12 @@ type User struct {
 	Other    bool  `db:"other" entity:"deprecated"`
 }
 
-// Tablename 返回数据库表名
+// Tablename 返回数据库表名，entity.Entity接口方法
 func (u User) Tablename() string {
 	return "users"
 }
 
-// OnEntityEvent 存储事件回调方法
+// OnEntityEvent 存储事件回调方法，entity.Entity接口方法
 func (u *User) OnEntityEvent(ev entity.Event) error {
 	switch ev {
 	case entity.EventBeforeInsert:
@@ -43,7 +51,7 @@ func (u *User) OnEntityEvent(ev entity.Event) error {
 	return nil
 }
 
-// CacheOption 缓存配置
+// CacheOption 缓存配置，不实现这个方法就不会自动缓存，entity.Cacheable接口方法
 func (u *User) CacheOption() entity.CacheOption {
 	return entity.CacheOption{
 		Key:        fmt.Sprintf(`user:entity:%d`, u.ID),
