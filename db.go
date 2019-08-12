@@ -312,7 +312,7 @@ func selectStatement(entity Entity, md *Metadata, dia *dialect) string {
 
 func insertStatement(entity Entity, md *Metadata, dia *dialect) string {
 	columns := []string{}
-	returning := []string{}
+	returnings := []string{}
 	placeholder := []string{}
 
 	for _, col := range md.Columns {
@@ -321,15 +321,12 @@ func insertStatement(entity Entity, md *Metadata, dia *dialect) string {
 		}
 
 		c := quoteColumn(col.DBField, dia)
-		if col.Returning {
-			returning = append(returning, c)
-		}
-
 		if dia.Returning && col.Returning {
-			continue
+			returnings = append(returnings, c)
+		} else {
+			columns = append(columns, c)
+			placeholder = append(placeholder, fmt.Sprintf(":%s", col.DBField))
 		}
-		columns = append(columns, c)
-		placeholder = append(placeholder, fmt.Sprintf(":%s", col.DBField))
 	}
 
 	stmt := fmt.Sprintf(
@@ -339,8 +336,8 @@ func insertStatement(entity Entity, md *Metadata, dia *dialect) string {
 		strings.Join(placeholder, ", "),
 	)
 
-	if dia.Returning && len(returning) > 0 {
-		stmt += fmt.Sprintf(" RETURNING %s", strings.Join(returning, ", "))
+	if dia.Returning && len(returnings) > 0 {
+		stmt += fmt.Sprintf(" RETURNING %s", strings.Join(returnings, ", "))
 	}
 
 	return stmt
@@ -356,13 +353,9 @@ func updateStatement(entity Entity, md *Metadata, dia *dialect) string {
 			continue
 		}
 
-		returning := dia.Returning && col.Returning
-
-		if returning {
+		if dia.Returning && col.Returning {
 			returnings = append(returnings, quoteColumn(col.DBField, dia))
-		}
-
-		if !returning {
+		} else {
 			if set == false {
 				stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, dia), col.DBField)
 				set = true
