@@ -39,7 +39,7 @@ func loadCache(entity Cacheable) (bool, error) {
 	data, err := opt.Cacher.Get(opt.Key)
 	if err != nil {
 		return false, errors.WithStack(err)
-	} else if data == nil {
+	} else if len(data) == 0 {
 		return false, nil
 	}
 
