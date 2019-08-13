@@ -297,7 +297,12 @@ func delete(ctx context.Context, entity Entity, db DB) error {
 }
 
 func selectStatement(entity Entity, md *Metadata, dia *dialect) string {
-	stmt := fmt.Sprintf("SELECT * FROM %s WHERE", md.TableName)
+	columns := []string{}
+	for _, col := range md.Columns {
+		columns = append(columns, quoteColumn(col.DBField, dia))
+	}
+	stmt := fmt.Sprintf("SELECT %s FROM %s WHERE", strings.Join(columns, ", "), md.TableName)
+
 	for i, col := range md.PrimaryKeys {
 		if i == 0 {
 			stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, dia), col.DBField)

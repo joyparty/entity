@@ -8,14 +8,14 @@ func TestStatement(t *testing.T) {
 
 		dia := &dialect{Driver: "mysql", Returning: false}
 		stmt := selectStatement(&GenernalEntity{}, md, dia)
-		expected := "SELECT * FROM genernal WHERE `id` = :id AND `id2` = :id2 LIMIT 1"
+		expected := "SELECT `id`, `id2`, `name`, `create_at`, `version` FROM genernal WHERE `id` = :id AND `id2` = :id2 LIMIT 1"
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
 
 		dia = &dialect{Driver: "postgres", Returning: true}
 		stmt = selectStatement(&GenernalEntity{}, md, dia)
-		expected = `SELECT * FROM genernal WHERE "id" = :id AND "id2" = :id2 LIMIT 1`
+		expected = `SELECT "id", "id2", "name", "create_at", "version" FROM genernal WHERE "id" = :id AND "id2" = :id2 LIMIT 1`
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
