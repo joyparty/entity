@@ -7,6 +7,9 @@ import (
 	"github.com/pkg/errors"
 )
 
+// DefaultCacher 默认缓存存储
+var DefaultCacher Cacher
+
 // Cacheable 可缓存实体对象接口
 type Cacheable interface {
 	CacheOption() *CacheOption
@@ -90,7 +93,11 @@ func getCacheOption(entity Cacheable) (*CacheOption, error) {
 	opt := entity.CacheOption()
 
 	if opt.Cacher == nil {
-		return nil, errors.New("require cacher")
+		if DefaultCacher == nil {
+			return nil, errors.New("require cacher")
+		}
+
+		opt.Cacher = DefaultCacher
 	}
 
 	if opt.Key == "" {
