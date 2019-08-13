@@ -148,8 +148,8 @@ func insert(ctx context.Context, entity Entity, db DB) (int64, error) {
 
 	dia := getDialect(db)
 
-	var stmt string
-	if stmt, ok := insertStatements[md.ID]; !ok {
+	stmt, ok := insertStatements[md.ID]
+	if !ok {
 		stmt = insertStatement(entity, md, dia)
 		insertStatements[md.ID] = stmt
 	}
@@ -217,8 +217,8 @@ func update(ctx context.Context, entity Entity, db DB) error {
 
 	dia := getDialect(db)
 
-	var stmt string
-	if stmt, ok := updateStatements[md.ID]; !ok {
+	stmt, ok := updateStatements[md.ID]
+	if !ok {
 		stmt = updateStatement(entity, md, dia)
 		updateStatements[md.ID] = stmt
 	}
@@ -286,8 +286,8 @@ func delete(ctx context.Context, entity Entity, db DB) error {
 		return errors.WithMessage(err, "delete entity")
 	}
 
-	var stmt string
-	if stmt, ok := deleteStatements[md.ID]; !ok {
+	stmt, ok := deleteStatements[md.ID]
+	if !ok {
 		stmt = deleteStatement(entity, md, getDialect(db))
 		deleteStatements[md.ID] = stmt
 	}
