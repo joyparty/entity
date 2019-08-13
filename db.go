@@ -96,8 +96,8 @@ func load(ctx context.Context, entity Entity, db DB) error {
 		return err
 	}
 
-	var stmt string
-	if stmt, ok := selectStatements[md.ID]; !ok {
+	stmt, ok := selectStatements[md.ID]
+	if !ok {
 		stmt = selectStatement(entity, md, getDialect(db))
 		selectStatements[md.ID] = stmt
 	}
