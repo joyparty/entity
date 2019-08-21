@@ -55,7 +55,11 @@ func TestColumns(t *testing.T) {
 		},
 	}
 
-	columns := getColumns(&GenernalEntity{})
+	columns, err := getColumns(&GenernalEntity{})
+	if err != nil {
+		t.Fatalf("GenernalEntity column error, Expected=nil, Actual=%s", err.Error())
+	}
+
 	for _, col := range columns {
 		expected := cases[col.DBField]
 
@@ -68,6 +72,12 @@ func TestColumns(t *testing.T) {
 		} else if expected.returning != col.Returning {
 			t.Fatalf("GenernalEntity column %q Returning, Expected=%v, Actual=%v", col.DBField, expected.returning, col.Returning)
 		}
+	}
+
+	_, err = getColumns(GenernalEntity{})
+	t.Log(err)
+	if err == nil {
+		t.Fatal(`GenernalEntity column, Expected non-pointer error, Actual=nil`)
 	}
 }
 
@@ -86,7 +96,7 @@ func (ge GenernalEntity) TableName() string {
 	return "genernal"
 }
 
-func (ge *GenernalEntity) OnEntityEvent(ev Event) error {
+func (ge GenernalEntity) OnEntityEvent(ev Event) error {
 	return nil
 }
 

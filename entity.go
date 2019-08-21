@@ -64,11 +64,16 @@ type Metadata struct {
 
 // NewMetadata 构造实体对象元数据
 func NewMetadata(entity Entity) (*Metadata, error) {
+	columns, err := getColumns(entity)
+	if err != nil {
+		return nil, errors.WithMessage(err, "entity metadata")
+	}
+
 	id := entityID(entity)
 	md := &Metadata{
 		ID:          id,
 		TableName:   entity.TableName(),
-		Columns:     getColumns(entity),
+		Columns:     columns,
 		PrimaryKeys: []Column{},
 	}
 
@@ -104,12 +109,17 @@ func getMetadata(entity Entity) (*Metadata, error) {
 	return md, nil
 }
 
-func getColumns(entity Entity) []Column {
+func getColumns(entity Entity) ([]Column, error) {
 	cols := []Column{}
 
-	v := reflect.TypeOf(entity).Elem()
-	for i, len := 0, v.NumField(); i < len; i++ {
-		field := v.Field(i)
+	rt := reflect.TypeOf(entity)
+	if rt.Kind() != reflect.Ptr {
+		return nil, errors.Errorf("entity columns, non-pointer %s", rt.String())
+	}
+	rt = rt.Elem()
+
+	for i, len := 0, rt.NumField(); i < len; i++ {
+		field := rt.Field(i)
 		dbField := field.Tag.Get("db")
 		if dbField == "" || dbField == "-" {
 			continue
@@ -142,7 +152,7 @@ func getColumns(entity Entity) []Column {
 			cols = append(cols, col)
 		}
 	}
-	return cols
+	return cols, nil
 }
 
 func entityID(entity Entity) string {
