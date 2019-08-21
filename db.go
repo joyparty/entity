@@ -264,7 +264,7 @@ func Delete(ctx context.Context, entity Entity, db DB) error {
 		return err
 	}
 
-	if err := delete(ctx, entity, db); err != nil {
+	if err := _delete(ctx, entity, db); err != nil {
 		return err
 	}
 
@@ -280,7 +280,7 @@ func Delete(ctx context.Context, entity Entity, db DB) error {
 	)
 }
 
-func delete(ctx context.Context, entity Entity, db DB) error {
+func _delete(ctx context.Context, entity Entity, db DB) error {
 	md, err := getMetadata(entity)
 	if err != nil {
 		return errors.WithMessage(err, "delete entity")
@@ -361,11 +361,11 @@ func updateStatement(entity Entity, md *Metadata, dia *dialect) string {
 		if dia.Returning && col.Returning {
 			returnings = append(returnings, quoteColumn(col.DBField, dia))
 		} else {
-			if set == false {
+			if set {
+				stmt += fmt.Sprintf(", %s = :%s", quoteColumn(col.DBField, dia), col.DBField)
+			} else {
 				stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, dia), col.DBField)
 				set = true
-			} else {
-				stmt += fmt.Sprintf(", %s = :%s", quoteColumn(col.DBField, dia), col.DBField)
 			}
 		}
 	}
