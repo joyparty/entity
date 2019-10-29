@@ -46,16 +46,13 @@ type dialect struct {
 
 func getDialect(db DB) *dialect {
 	driver := db.DriverName()
-	if driver == "pgx" {
-		driver = "postgres"
-	}
 
 	if v, ok := dialects[driver]; ok {
 		return v
 	}
 
 	dia := &dialect{Driver: db.DriverName()}
-	if dia.Driver == "postgres" {
+	if isPostgres(dia.Driver) {
 		dia.Returning = true
 	}
 
@@ -394,10 +391,13 @@ func deleteStatement(entity Entity, md *Metadata, dia *dialect) string {
 }
 
 func quoteColumn(name string, dia *dialect) string {
-	dn := dia.Driver
-	if dn == "postgres" {
+	if isPostgres(dia.Driver) {
 		return fmt.Sprintf("%q", name)
 	}
 
 	return fmt.Sprintf("`%s`", name)
+}
+
+func isPostgres(driverName string) bool {
+	return driverName == "postgres" || driverName == "pgx"
 }
