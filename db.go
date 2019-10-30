@@ -54,7 +54,7 @@ func getDialect(db DB) *dialect {
 		return v
 	}
 
-	dia := &dialect{Driver: db.DriverName()}
+	dia := &dialect{Driver: driver}
 	if dia.Driver == "postgres" {
 		dia.Returning = true
 	}
