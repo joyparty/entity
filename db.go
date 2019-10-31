@@ -177,11 +177,13 @@ func insert(ctx context.Context, entity Entity, db DB) (int64, error) {
 		return 0, errors.WithStack(err)
 	}
 
-	lastID, err := result.LastInsertId()
-	if err != nil {
-		return 0, errors.WithStack(err)
+	// postgresql不支持LastInsertId特性
+	if db.DriverName() == "pgx" || db.DriverName() == "postgres" {
+		return 0, nil
 	}
-	return lastID, nil
+
+	lastID, err := result.LastInsertId()
+	return lastID, errors.WithStack(err)
 }
 
 // Update 更新entity
