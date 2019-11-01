@@ -1,6 +1,7 @@
 package entity
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -96,7 +97,7 @@ func (ge GenernalEntity) TableName() string {
 	return "genernal"
 }
 
-func (ge GenernalEntity) OnEntityEvent(ev Event) error {
+func (ge GenernalEntity) OnEntityEvent(ctx context.Context, ev Event) error {
 	return nil
 }
 
@@ -109,7 +110,7 @@ func (ee EmptyEntity) TableName() string {
 	return "emtpy"
 }
 
-func (ee *EmptyEntity) OnEntityEvent(ev Event) error {
+func (ee *EmptyEntity) OnEntityEvent(ctx context.Context, ev Event) error {
 	return nil
 }
 
@@ -122,6 +123,6 @@ func (npe NoPrimaryKeyEntity) TableName() string {
 	return "no_primary_key"
 }
 
-func (npe *NoPrimaryKeyEntity) OnEntityEvent(ev Event) error {
+func (npe *NoPrimaryKeyEntity) OnEntityEvent(ctx context.Context, ev Event) error {
 	return nil
 }

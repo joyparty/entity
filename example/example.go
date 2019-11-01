@@ -42,7 +42,7 @@ func (u User) TableName() string {
 }
 
 // OnEntityEvent 存储事件回调方法，entity.Entity接口方法
-func (u *User) OnEntityEvent(ev entity.Event) error {
+func (u *User) OnEntityEvent(ctx context.Context, ev entity.Event) error {
 	switch ev {
 	case entity.EventBeforeInsert:
 		u.CreateAt = time.Now().Unix()

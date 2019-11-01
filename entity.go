@@ -1,6 +1,7 @@
 package entity
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -41,7 +42,7 @@ type Event int
 // Entity 实体对象接口
 type Entity interface {
 	TableName() string
-	OnEntityEvent(ev Event) error
+	OnEntityEvent(ctx context.Context, ev Event) error
 }
 
 // Column 字段信息

@@ -124,7 +124,7 @@ func Insert(ctx context.Context, entity Entity, db DB) (int64, error) {
 	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
 	defer cancel()
 
-	if err := entity.OnEntityEvent(EventBeforeInsert); err != nil {
+	if err := entity.OnEntityEvent(ctx, EventBeforeInsert); err != nil {
 		return 0, errors.WithMessage(err, "before insert entity")
 	}
 
@@ -133,7 +133,7 @@ func Insert(ctx context.Context, entity Entity, db DB) (int64, error) {
 		return 0, errors.WithMessage(err, "insert entity")
 	}
 
-	if err := entity.OnEntityEvent(EventAfterInsert); err != nil {
+	if err := entity.OnEntityEvent(ctx, EventAfterInsert); err != nil {
 		return 0, errors.WithMessage(err, "after insert entity")
 	}
 
@@ -191,7 +191,7 @@ func Update(ctx context.Context, entity Entity, db DB) error {
 	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
 	defer cancel()
 
-	if err := entity.OnEntityEvent(EventBeforeUpdate); err != nil {
+	if err := entity.OnEntityEvent(ctx, EventBeforeUpdate); err != nil {
 		return errors.WithMessage(err, "before update entity")
 	}
 
@@ -206,7 +206,7 @@ func Update(ctx context.Context, entity Entity, db DB) error {
 	}
 
 	return errors.WithMessage(
-		entity.OnEntityEvent(EventAfterUpdate),
+		entity.OnEntityEvent(ctx, EventAfterUpdate),
 		"after update entity",
 	)
 }
@@ -262,7 +262,7 @@ func Delete(ctx context.Context, entity Entity, db DB) error {
 	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
 	defer cancel()
 
-	if err := entity.OnEntityEvent(EventBeforeDelete); err != nil {
+	if err := entity.OnEntityEvent(ctx, EventBeforeDelete); err != nil {
 		return err
 	}
 
@@ -277,7 +277,7 @@ func Delete(ctx context.Context, entity Entity, db DB) error {
 	}
 
 	return errors.WithMessage(
-		entity.OnEntityEvent(EventAfterDelete),
+		entity.OnEntityEvent(ctx, EventAfterDelete),
 		"after delete entity",
 	)
 }
