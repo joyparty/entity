@@ -323,14 +323,17 @@ func insertStatement(entity Entity, md *Metadata, dia *dialect) string {
 	placeholder := []string{}
 
 	for _, col := range md.Columns {
+		c := quoteColumn(col.DBField, dia)
+		returing := dia.Returning && col.Returning
+		if returing {
+			returnings = append(returnings, c)
+		}
+
 		if col.AutoIncrement {
 			continue
 		}
 
-		c := quoteColumn(col.DBField, dia)
-		if dia.Returning && col.Returning {
-			returnings = append(returnings, c)
-		} else {
+		if !returing {
 			columns = append(columns, c)
 			placeholder = append(placeholder, fmt.Sprintf(":%s", col.DBField))
 		}
