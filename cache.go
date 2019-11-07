@@ -33,8 +33,8 @@ type CacheOption struct {
 	AutoDecode []string
 }
 
-func loadCache(entity Cacheable) (bool, error) {
-	opt, err := getCacheOption(entity)
+func loadCache(ent Cacheable) (bool, error) {
+	opt, err := getCacheOption(ent)
 	if err != nil {
 		return false, err
 	}
@@ -57,7 +57,7 @@ func loadCache(entity Cacheable) (bool, error) {
 		}
 	}
 
-	if err := jsoniter.Unmarshal(data, entity); err != nil {
+	if err := jsoniter.Unmarshal(data, ent); err != nil {
 		return false, errors.WithStack(err)
 	}
 
@@ -65,13 +65,13 @@ func loadCache(entity Cacheable) (bool, error) {
 }
 
 // SaveCache 保存entity缓存
-func SaveCache(entity Cacheable) error {
-	data, err := jsoniter.Marshal(entity)
+func SaveCache(ent Cacheable) error {
+	data, err := jsoniter.Marshal(ent)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	opt, err := getCacheOption(entity)
+	opt, err := getCacheOption(ent)
 	if err != nil {
 		return err
 	}
@@ -80,8 +80,8 @@ func SaveCache(entity Cacheable) error {
 }
 
 // DeleteCache 删除entity缓存
-func DeleteCache(entity Cacheable) error {
-	opt, err := getCacheOption(entity)
+func DeleteCache(ent Cacheable) error {
+	opt, err := getCacheOption(ent)
 	if err != nil {
 		return err
 	}
@@ -89,8 +89,8 @@ func DeleteCache(entity Cacheable) error {
 	return errors.Wrap(opt.Cacher.Delete(opt.Key), "delete entity cache")
 }
 
-func getCacheOption(entity Cacheable) (*CacheOption, error) {
-	opt := entity.CacheOption()
+func getCacheOption(ent Cacheable) (*CacheOption, error) {
+	opt := ent.CacheOption()
 
 	if opt.Cacher == nil {
 		if DefaultCacher == nil {

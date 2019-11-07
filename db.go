@@ -64,11 +64,11 @@ func getDialect(db DB) *dialect {
 }
 
 // Load 从数据库载入entity
-func Load(ctx context.Context, entity Entity, db DB) error {
+func Load(ctx context.Context, ent Entity, db DB) error {
 	ctx, cancel := context.WithTimeout(ctx, ReadTimeout)
 	defer cancel()
 
-	cv, cacheable := entity.(Cacheable)
+	cv, cacheable := ent.(Cacheable)
 	if cacheable {
 		if loaded, err := loadCache(cv); err != nil {
 			return errors.WithMessage(err, "load entity from cache")
@@ -77,7 +77,7 @@ func Load(ctx context.Context, entity Entity, db DB) error {
 		}
 	}
 
-	if err := load(ctx, entity, db); err != nil {
+	if err := load(ctx, ent, db); err != nil {
 		return errors.WithMessage(err, "load entity from db")
 	}
 
@@ -90,19 +90,19 @@ func Load(ctx context.Context, entity Entity, db DB) error {
 	return nil
 }
 
-func load(ctx context.Context, entity Entity, db DB) error {
-	md, err := getMetadata(entity)
+func load(ctx context.Context, ent Entity, db DB) error {
+	md, err := getMetadata(ent)
 	if err != nil {
 		return err
 	}
 
 	stmt, ok := selectStatements[md.ID]
 	if !ok {
-		stmt = selectStatement(entity, md, getDialect(db))
+		stmt = selectStatement(ent, md, getDialect(db))
 		selectStatements[md.ID] = stmt
 	}
 
-	rows, err := sqlx.NamedQueryContext(ctx, db, stmt, entity)
+	rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -112,7 +112,7 @@ func load(ctx context.Context, entity Entity, db DB) error {
 		return errors.WithStack(sql.ErrNoRows)
 	}
 
-	if err := rows.StructScan(entity); err != nil {
+	if err := rows.StructScan(ent); err != nil {
 		return errors.WithStack(err)
 	}
 
@@ -120,28 +120,28 @@ func load(ctx context.Context, entity Entity, db DB) error {
 }
 
 // Insert 插入新entity
-func Insert(ctx context.Context, entity Entity, db DB) (int64, error) {
+func Insert(ctx context.Context, ent Entity, db DB) (int64, error) {
 	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
 	defer cancel()
 
-	if err := entity.OnEntityEvent(ctx, EventBeforeInsert); err != nil {
+	if err := ent.OnEntityEvent(ctx, EventBeforeInsert); err != nil {
 		return 0, errors.WithMessage(err, "before insert entity")
 	}
 
-	lastID, err := insert(ctx, entity, db)
+	lastID, err := insert(ctx, ent, db)
 	if err != nil {
 		return 0, errors.WithMessage(err, "insert entity")
 	}
 
-	if err := entity.OnEntityEvent(ctx, EventAfterInsert); err != nil {
+	if err := ent.OnEntityEvent(ctx, EventAfterInsert); err != nil {
 		return 0, errors.WithMessage(err, "after insert entity")
 	}
 
 	return lastID, nil
 }
 
-func insert(ctx context.Context, entity Entity, db DB) (int64, error) {
-	md, err := getMetadata(entity)
+func insert(ctx context.Context, ent Entity, db DB) (int64, error) {
+	md, err := getMetadata(ent)
 	if err != nil {
 		return 0, err
 	}
@@ -150,12 +150,12 @@ func insert(ctx context.Context, entity Entity, db DB) (int64, error) {
 
 	stmt, ok := insertStatements[md.ID]
 	if !ok {
-		stmt = insertStatement(entity, md, dia)
+		stmt = insertStatement(ent, md, dia)
 		insertStatements[md.ID] = stmt
 	}
 
 	if dia.Returning && strings.Contains(stmt, ") RETURNING ") {
-		rows, err := sqlx.NamedQueryContext(ctx, db, stmt, entity)
+		rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
 		if err != nil {
 			return 0, errors.WithStack(err)
 		}
@@ -165,14 +165,14 @@ func insert(ctx context.Context, entity Entity, db DB) (int64, error) {
 			return 0, errors.WithStack(sql.ErrNoRows)
 		}
 
-		if err := rows.StructScan(entity); err != nil {
+		if err := rows.StructScan(ent); err != nil {
 			return 0, errors.WithStack(err)
 		}
 
 		return 0, errors.WithStack(rows.Err())
 	}
 
-	result, err := db.NamedExecContext(ctx, stmt, entity)
+	result, err := db.NamedExecContext(ctx, stmt, ent)
 	if err != nil {
 		return 0, errors.WithStack(err)
 	}
@@ -187,32 +187,32 @@ func insert(ctx context.Context, entity Entity, db DB) (int64, error) {
 }
 
 // Update 更新entity
-func Update(ctx context.Context, entity Entity, db DB) error {
+func Update(ctx context.Context, ent Entity, db DB) error {
 	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
 	defer cancel()
 
-	if err := entity.OnEntityEvent(ctx, EventBeforeUpdate); err != nil {
+	if err := ent.OnEntityEvent(ctx, EventBeforeUpdate); err != nil {
 		return errors.WithMessage(err, "before update entity")
 	}
 
-	if err := update(ctx, entity, db); err != nil {
+	if err := update(ctx, ent, db); err != nil {
 		return errors.WithMessage(err, "update entity")
 	}
 
-	if v, ok := entity.(Cacheable); ok {
+	if v, ok := ent.(Cacheable); ok {
 		if err := DeleteCache(v); err != nil {
 			return errors.WithMessage(err, "after update entity")
 		}
 	}
 
 	return errors.WithMessage(
-		entity.OnEntityEvent(ctx, EventAfterUpdate),
+		ent.OnEntityEvent(ctx, EventAfterUpdate),
 		"after update entity",
 	)
 }
 
-func update(ctx context.Context, entity Entity, db DB) error {
-	md, err := getMetadata(entity)
+func update(ctx context.Context, ent Entity, db DB) error {
+	md, err := getMetadata(ent)
 	if err != nil {
 		return err
 	}
@@ -221,12 +221,12 @@ func update(ctx context.Context, entity Entity, db DB) error {
 
 	stmt, ok := updateStatements[md.ID]
 	if !ok {
-		stmt = updateStatement(entity, md, dia)
+		stmt = updateStatement(ent, md, dia)
 		updateStatements[md.ID] = stmt
 	}
 
 	if dia.Returning && strings.Contains(stmt, " RETURNING ") {
-		rows, err := sqlx.NamedQueryContext(ctx, db, stmt, entity)
+		rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -236,14 +236,14 @@ func update(ctx context.Context, entity Entity, db DB) error {
 			return errors.WithStack(sql.ErrNoRows)
 		}
 
-		if err := rows.StructScan(entity); err != nil {
+		if err := rows.StructScan(ent); err != nil {
 			return errors.WithStack(err)
 		}
 
 		return errors.WithStack(rows.Err())
 	}
 
-	result, err := db.NamedExecContext(ctx, stmt, entity)
+	result, err := db.NamedExecContext(ctx, stmt, ent)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -258,47 +258,47 @@ func update(ctx context.Context, entity Entity, db DB) error {
 }
 
 // Delete 删除entity
-func Delete(ctx context.Context, entity Entity, db DB) error {
+func Delete(ctx context.Context, ent Entity, db DB) error {
 	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
 	defer cancel()
 
-	if err := entity.OnEntityEvent(ctx, EventBeforeDelete); err != nil {
+	if err := ent.OnEntityEvent(ctx, EventBeforeDelete); err != nil {
 		return err
 	}
 
-	if err := _delete(ctx, entity, db); err != nil {
+	if err := _delete(ctx, ent, db); err != nil {
 		return err
 	}
 
-	if v, ok := entity.(Cacheable); ok {
+	if v, ok := ent.(Cacheable); ok {
 		if err := DeleteCache(v); err != nil {
 			return errors.WithMessage(err, "after delete entity")
 		}
 	}
 
 	return errors.WithMessage(
-		entity.OnEntityEvent(ctx, EventAfterDelete),
+		ent.OnEntityEvent(ctx, EventAfterDelete),
 		"after delete entity",
 	)
 }
 
-func _delete(ctx context.Context, entity Entity, db DB) error {
-	md, err := getMetadata(entity)
+func _delete(ctx context.Context, ent Entity, db DB) error {
+	md, err := getMetadata(ent)
 	if err != nil {
 		return errors.WithMessage(err, "delete entity")
 	}
 
 	stmt, ok := deleteStatements[md.ID]
 	if !ok {
-		stmt = deleteStatement(entity, md, getDialect(db))
+		stmt = deleteStatement(ent, md, getDialect(db))
 		deleteStatements[md.ID] = stmt
 	}
 
-	_, err = db.NamedExecContext(ctx, stmt, entity)
+	_, err = db.NamedExecContext(ctx, stmt, ent)
 	return errors.Wrapf(err, "delete entity %s", md.ID)
 }
 
-func selectStatement(entity Entity, md *Metadata, dia *dialect) string {
+func selectStatement(ent Entity, md *Metadata, dia *dialect) string {
 	columns := []string{}
 	for _, col := range md.Columns {
 		columns = append(columns, quoteColumn(col.DBField, dia))
@@ -317,7 +317,7 @@ func selectStatement(entity Entity, md *Metadata, dia *dialect) string {
 	return stmt
 }
 
-func insertStatement(entity Entity, md *Metadata, dia *dialect) string {
+func insertStatement(ent Entity, md *Metadata, dia *dialect) string {
 	columns := []string{}
 	returnings := []string{}
 	placeholder := []string{}
@@ -353,7 +353,7 @@ func insertStatement(entity Entity, md *Metadata, dia *dialect) string {
 	return stmt
 }
 
-func updateStatement(entity Entity, md *Metadata, dia *dialect) string {
+func updateStatement(ent Entity, md *Metadata, dia *dialect) string {
 	returnings := []string{}
 	stmt := fmt.Sprintf("UPDATE %s SET", md.TableName)
 
@@ -390,7 +390,7 @@ func updateStatement(entity Entity, md *Metadata, dia *dialect) string {
 	return stmt
 }
 
-func deleteStatement(entity Entity, md *Metadata, dia *dialect) string {
+func deleteStatement(ent Entity, md *Metadata, dia *dialect) string {
 	stmt := fmt.Sprintf("DELETE FROM %s WHERE", md.TableName)
 	for i, col := range md.PrimaryKeys {
 		if i == 0 {

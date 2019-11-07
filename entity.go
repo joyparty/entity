@@ -64,16 +64,16 @@ type Metadata struct {
 }
 
 // NewMetadata 构造实体对象元数据
-func NewMetadata(entity Entity) (*Metadata, error) {
-	columns, err := getColumns(entity)
+func NewMetadata(ent Entity) (*Metadata, error) {
+	columns, err := getColumns(ent)
 	if err != nil {
 		return nil, errors.WithMessage(err, "entity metadata")
 	}
 
-	id := entityID(entity)
+	id := entityID(ent)
 	md := &Metadata{
 		ID:          id,
-		TableName:   entity.TableName(),
+		TableName:   ent.TableName(),
 		Columns:     columns,
 		PrimaryKeys: []Column{},
 	}
@@ -95,13 +95,13 @@ func NewMetadata(entity Entity) (*Metadata, error) {
 	return md, nil
 }
 
-func getMetadata(entity Entity) (*Metadata, error) {
-	id := entityID(entity)
+func getMetadata(ent Entity) (*Metadata, error) {
+	id := entityID(ent)
 	if md, ok := entites[id]; ok {
 		return md, nil
 	}
 
-	md, err := NewMetadata(entity)
+	md, err := NewMetadata(ent)
 	if err != nil {
 		return nil, err
 	}
@@ -110,10 +110,10 @@ func getMetadata(entity Entity) (*Metadata, error) {
 	return md, nil
 }
 
-func getColumns(entity Entity) ([]Column, error) {
+func getColumns(ent Entity) ([]Column, error) {
 	cols := []Column{}
 
-	rt := reflect.TypeOf(entity)
+	rt := reflect.TypeOf(ent)
 	if rt.Kind() != reflect.Ptr {
 		return nil, errors.Errorf("entity columns, non-pointer %s", rt.String())
 	}
@@ -156,7 +156,7 @@ func getColumns(entity Entity) ([]Column, error) {
 	return cols, nil
 }
 
-func entityID(entity Entity) string {
-	v := reflect.TypeOf(entity).Elem()
+func entityID(ent Entity) string {
+	v := reflect.TypeOf(ent).Elem()
 	return fmt.Sprintf("%s.%s", v.PkgPath(), v.Name())
 }
