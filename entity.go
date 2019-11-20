@@ -156,10 +156,12 @@ func getColumns(ent Entity) ([]Column, error) {
 			} else if val == "returning" {
 				col.ReturningInsert = true
 				col.ReturningUpdate = true
+				col.RefuseUpdate = true
 			} else if val == "returningInsert" {
 				col.ReturningInsert = true
 			} else if val == "returningUpdate" {
 				col.ReturningUpdate = true
+				col.RefuseUpdate = true
 			} else if val == "autoIncrement" {
 				col.AutoIncrement = true
 				col.RefuseUpdate = true

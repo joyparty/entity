@@ -22,7 +22,7 @@ type User struct {
 可用tag:
 
 - `primaryKey` 主键字段，每个实体对象至少要声明一个
-- `refuseUpdate` 不允许更新，UPDATE时会被忽略
+- `refuseUpdate` 不允许更新，UPDATE时会被忽略，当设置了`primaryKey`或`autoIncrement`或`returningUpdate`时，这个配置会自动生效
 - `autoIncrement` 自增长主键，构造INSERT时此字段会被忽略
 - `returningInsert` insert时，这个字段会被放到`RETURNING`子句内返回，无论使用的数据库是否支持`RETURNING`
 - `returningUpdate` update时，这个字段会被放到`RETURNING`子句内返回，无论使用的数据库是否支持`RETURNING`

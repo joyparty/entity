@@ -56,6 +56,7 @@ func TestColumns(t *testing.T) {
 		"version": {
 			returningInsert: true,
 			returningUpdate: true,
+			refuseUpdate:    true,
 		},
 	}
 
