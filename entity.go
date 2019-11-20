@@ -28,6 +28,9 @@ const (
 )
 
 var (
+	// ErrConflict 发生了数据冲突
+	ErrConflict = fmt.Errorf("database record conflict")
+
 	// ReadTimeout 读取entity数据的默认超时时间
 	ReadTimeout = 3 * time.Second
 	// WriteTimeout 写入entity数据的默认超时时间
@@ -215,6 +218,9 @@ func Insert(ctx context.Context, ent Entity, db DB) (int64, error) {
 
 	lastID, err := doInsert(ctx, ent, db)
 	if err != nil {
+		if isConflictError(db.DriverName(), err) {
+			return 0, errors.Wrap(ErrConflict, "insert entity")
+		}
 		return 0, errors.WithMessage(err, "insert entity")
 	}
 
@@ -235,6 +241,9 @@ func Update(ctx context.Context, ent Entity, db DB) error {
 	}
 
 	if err := doUpdate(ctx, ent, db); err != nil {
+		if isConflictError(db.DriverName(), err) {
+			return errors.Wrap(ErrConflict, "update entity")
+		}
 		return errors.WithMessage(err, "update entity")
 	}
 

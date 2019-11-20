@@ -36,6 +36,18 @@ type DB interface {
 	BindNamed(string, interface{}) (string, []interface{}, error)
 }
 
+func isConflictError(driver string, err error) bool {
+	s := errors.Cause(err).Error()
+	if isPostgres(driver) {
+		return strings.Contains(s, "duplicate key value violates unique constraint")
+	} else if driver == "mysql" {
+		return strings.Contains(s, "Duplicate entry")
+	} else if driver == "sqlite3" {
+		return strings.Contains(s, "UNIQUE constraint failed")
+	}
+	return false
+}
+
 func isPostgres(driver string) bool {
 	return driver == "pgx" || driver == "postgres"
 }
