@@ -47,12 +47,13 @@ type Entity interface {
 
 // Column 字段信息
 type Column struct {
-	StructField   string
-	DBField       string
-	PrimaryKey    bool
-	AutoIncrement bool
-	RefuseUpdate  bool
-	Returning     bool
+	StructField     string
+	DBField         string
+	PrimaryKey      bool
+	AutoIncrement   bool
+	RefuseUpdate    bool
+	ReturningInsert bool
+	ReturningUpdate bool
 }
 
 // Metadata 元数据
@@ -61,6 +62,9 @@ type Metadata struct {
 	TableName   string
 	Columns     []Column
 	PrimaryKeys []Column
+
+	hasReturningInsert bool
+	hasReturningUpdate bool
 }
 
 // NewMetadata 构造实体对象元数据
@@ -83,6 +87,12 @@ func NewMetadata(ent Entity) (*Metadata, error) {
 	}
 
 	for _, col := range md.Columns {
+		if col.ReturningInsert {
+			md.hasReturningInsert = true
+		}
+		if col.ReturningUpdate {
+			md.hasReturningUpdate = true
+		}
 		if col.PrimaryKey {
 			md.PrimaryKeys = append(md.PrimaryKeys, col)
 		}
@@ -141,9 +151,15 @@ func getColumns(ent Entity) ([]Column, error) {
 			} else if val == "refuseUpdate" {
 				col.RefuseUpdate = true
 			} else if val == "returning" {
-				col.Returning = true
+				col.ReturningInsert = true
+				col.ReturningUpdate = true
+			} else if val == "returningInsert" {
+				col.ReturningInsert = true
+			} else if val == "returningUpdate" {
+				col.ReturningUpdate = true
 			} else if val == "autoIncrement" {
 				col.AutoIncrement = true
+				col.RefuseUpdate = true
 			} else if val == "deprecated" {
 				deprecated = true
 			}

@@ -40,8 +40,7 @@ type DB interface {
 
 // dialect 数据库特性
 type dialect struct {
-	Driver    string
-	Returning bool
+	Driver string
 }
 
 func isPostgres(db DB) bool {
@@ -60,10 +59,6 @@ func getDialect(db DB) *dialect {
 	}
 
 	dia := &dialect{Driver: driver}
-	if dia.Driver == "postgres" {
-		dia.Returning = true
-	}
-
 	dialects[dia.Driver] = dia
 	return dia
 }
@@ -111,7 +106,7 @@ func doInsert(ctx context.Context, ent Entity, db DB) (int64, error) {
 		insertStatements[md.ID] = stmt
 	}
 
-	if dia.Returning && strings.Contains(stmt, ") RETURNING ") {
+	if md.hasReturningInsert {
 		rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
 		if err != nil {
 			return 0, errors.WithStack(err)
@@ -157,7 +152,7 @@ func doUpdate(ctx context.Context, ent Entity, db DB) error {
 		updateStatements[md.ID] = stmt
 	}
 
-	if dia.Returning && strings.Contains(stmt, " RETURNING ") {
+	if md.hasReturningUpdate {
 		rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
 		if err != nil {
 			return errors.WithStack(err)
@@ -187,6 +182,7 @@ func doUpdate(ctx context.Context, ent Entity, db DB) error {
 	}
 
 	return nil
+
 }
 
 func doDelete(ctx context.Context, ent Entity, db DB) error {
@@ -231,16 +227,9 @@ func insertStatement(ent Entity, md *Metadata, dia *dialect) string {
 
 	for _, col := range md.Columns {
 		c := quoteColumn(col.DBField, dia)
-		returing := dia.Returning && col.Returning
-		if returing {
+		if col.ReturningInsert {
 			returnings = append(returnings, c)
-		}
-
-		if col.AutoIncrement {
-			continue
-		}
-
-		if !returing {
+		} else if !col.AutoIncrement {
 			columns = append(columns, c)
 			placeholder = append(placeholder, fmt.Sprintf(":%s", col.DBField))
 		}
@@ -253,7 +242,7 @@ func insertStatement(ent Entity, md *Metadata, dia *dialect) string {
 		strings.Join(placeholder, ", "),
 	)
 
-	if dia.Returning && len(returnings) > 0 {
+	if len(returnings) > 0 {
 		stmt += fmt.Sprintf(" RETURNING %s", strings.Join(returnings, ", "))
 	}
 
@@ -266,13 +255,9 @@ func updateStatement(ent Entity, md *Metadata, dia *dialect) string {
 
 	set := false
 	for _, col := range md.Columns {
-		if col.RefuseUpdate {
-			continue
-		}
-
-		if dia.Returning && col.Returning {
+		if col.ReturningUpdate {
 			returnings = append(returnings, quoteColumn(col.DBField, dia))
-		} else {
+		} else if !col.RefuseUpdate {
 			if set {
 				stmt += fmt.Sprintf(", %s = :%s", quoteColumn(col.DBField, dia), col.DBField)
 			} else {
@@ -290,7 +275,7 @@ func updateStatement(ent Entity, md *Metadata, dia *dialect) string {
 		}
 	}
 
-	if dia.Returning && len(returnings) > 0 {
+	if len(returnings) > 0 {
 		stmt += fmt.Sprintf(" RETURNING %s", strings.Join(returnings, ", "))
 	}
 

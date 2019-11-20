@@ -6,14 +6,14 @@ func TestStatement(t *testing.T) {
 	t.Run("select", func(t *testing.T) {
 		md, _ := NewMetadata(&GenernalEntity{})
 
-		dia := &dialect{Driver: "mysql", Returning: false}
+		dia := &dialect{Driver: "mysql"}
 		stmt := selectStatement(&GenernalEntity{}, md, dia)
 		expected := "SELECT `id`, `id2`, `name`, `create_at`, `version` FROM genernal WHERE `id` = :id AND `id2` = :id2 LIMIT 1"
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
 
-		dia = &dialect{Driver: "postgres", Returning: true}
+		dia = &dialect{Driver: "postgres"}
 		stmt = selectStatement(&GenernalEntity{}, md, dia)
 		expected = `SELECT "id", "id2", "name", "create_at", "version" FROM genernal WHERE "id" = :id AND "id2" = :id2 LIMIT 1`
 		if stmt != expected {
@@ -24,16 +24,16 @@ func TestStatement(t *testing.T) {
 	t.Run("insert", func(t *testing.T) {
 		md, _ := NewMetadata(&GenernalEntity{})
 
-		dia := &dialect{Driver: "mysql", Returning: false}
+		dia := &dialect{Driver: "mysql"}
 		stmt := insertStatement(&GenernalEntity{}, md, dia)
-		expected := "INSERT INTO genernal (`id2`, `name`, `create_at`, `version`) VALUES (:id2, :name, :create_at, :version)"
+		expected := "INSERT INTO genernal (`id2`, `name`) VALUES (:id2, :name) RETURNING `create_at`, `version`"
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
 
-		dia = &dialect{Driver: "postgres", Returning: true}
+		dia = &dialect{Driver: "postgres"}
 		stmt = insertStatement(&GenernalEntity{}, md, dia)
-		expected = `INSERT INTO genernal ("id2", "name", "create_at") VALUES (:id2, :name, :create_at) RETURNING "version"`
+		expected = `INSERT INTO genernal ("id2", "name") VALUES (:id2, :name) RETURNING "create_at", "version"`
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
@@ -42,14 +42,14 @@ func TestStatement(t *testing.T) {
 	t.Run("update", func(t *testing.T) {
 		md, _ := NewMetadata(&GenernalEntity{})
 
-		dia := &dialect{Driver: "mysql", Returning: false}
+		dia := &dialect{Driver: "mysql"}
 		stmt := updateStatement(&GenernalEntity{}, md, dia)
-		expected := "UPDATE genernal SET `name` = :name, `version` = :version WHERE `id` = :id AND `id2` = :id2"
+		expected := "UPDATE genernal SET `name` = :name WHERE `id` = :id AND `id2` = :id2 RETURNING `version`"
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
 
-		dia = &dialect{Driver: "postgres", Returning: true}
+		dia = &dialect{Driver: "postgres"}
 		stmt = updateStatement(&GenernalEntity{}, md, dia)
 		expected = `UPDATE genernal SET "name" = :name WHERE "id" = :id AND "id2" = :id2 RETURNING "version"`
 		if stmt != expected {
@@ -60,14 +60,14 @@ func TestStatement(t *testing.T) {
 	t.Run("delete", func(t *testing.T) {
 		md, _ := NewMetadata(&GenernalEntity{})
 
-		dia := &dialect{Driver: "mysql", Returning: false}
+		dia := &dialect{Driver: "mysql"}
 		stmt := deleteStatement(&GenernalEntity{}, md, dia)
 		expected := "DELETE FROM genernal WHERE `id` = :id AND `id2` = :id2"
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
 
-		dia = &dialect{Driver: "postgres", Returning: true}
+		dia = &dialect{Driver: "postgres"}
 		stmt = deleteStatement(&GenernalEntity{}, md, dia)
 		expected = `DELETE FROM genernal WHERE "id" = :id AND "id2" = :id2`
 		if stmt != expected {
