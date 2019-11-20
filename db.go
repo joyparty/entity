@@ -44,9 +44,14 @@ type dialect struct {
 	Returning bool
 }
 
+func isPostgres(db DB) bool {
+	dv := db.DriverName()
+	return dv == "pgx" || dv == "postgres"
+}
+
 func getDialect(db DB) *dialect {
 	driver := db.DriverName()
-	if driver == "pgx" {
+	if isPostgres(db) {
 		driver = "postgres"
 	}
 
@@ -130,7 +135,7 @@ func doInsert(ctx context.Context, ent Entity, db DB) (int64, error) {
 	}
 
 	// postgresql不支持LastInsertId特性
-	if db.DriverName() == "pgx" || db.DriverName() == "postgres" {
+	if isPostgres(db) {
 		return 0, nil
 	}
 
