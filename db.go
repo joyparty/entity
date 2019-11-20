@@ -15,8 +15,6 @@ var (
 	insertStatements = map[string]string{}
 	updateStatements = map[string]string{}
 	deleteStatements = map[string]string{}
-
-	dialects = map[string]*dialect{}
 )
 
 // DB 数据库接口
@@ -38,29 +36,8 @@ type DB interface {
 	BindNamed(string, interface{}) (string, []interface{}, error)
 }
 
-// dialect 数据库特性
-type dialect struct {
-	Driver string
-}
-
-func isPostgres(db DB) bool {
-	dv := db.DriverName()
-	return dv == "pgx" || dv == "postgres"
-}
-
-func getDialect(db DB) *dialect {
-	driver := db.DriverName()
-	if isPostgres(db) {
-		driver = "postgres"
-	}
-
-	if v, ok := dialects[driver]; ok {
-		return v
-	}
-
-	dia := &dialect{Driver: driver}
-	dialects[dia.Driver] = dia
-	return dia
+func isPostgres(driver string) bool {
+	return driver == "pgx" || driver == "postgres"
 }
 
 func doLoad(ctx context.Context, ent Entity, db DB) error {
@@ -71,7 +48,7 @@ func doLoad(ctx context.Context, ent Entity, db DB) error {
 
 	stmt, ok := selectStatements[md.ID]
 	if !ok {
-		stmt = selectStatement(ent, md, getDialect(db))
+		stmt = selectStatement(ent, md, db.DriverName())
 		selectStatements[md.ID] = stmt
 	}
 
@@ -98,11 +75,9 @@ func doInsert(ctx context.Context, ent Entity, db DB) (int64, error) {
 		return 0, err
 	}
 
-	dia := getDialect(db)
-
 	stmt, ok := insertStatements[md.ID]
 	if !ok {
-		stmt = insertStatement(ent, md, dia)
+		stmt = insertStatement(ent, md, db.DriverName())
 		insertStatements[md.ID] = stmt
 	}
 
@@ -130,7 +105,7 @@ func doInsert(ctx context.Context, ent Entity, db DB) (int64, error) {
 	}
 
 	// postgresql不支持LastInsertId特性
-	if isPostgres(db) {
+	if isPostgres(db.DriverName()) {
 		return 0, nil
 	}
 
@@ -144,11 +119,9 @@ func doUpdate(ctx context.Context, ent Entity, db DB) error {
 		return err
 	}
 
-	dia := getDialect(db)
-
 	stmt, ok := updateStatements[md.ID]
 	if !ok {
-		stmt = updateStatement(ent, md, dia)
+		stmt = updateStatement(ent, md, db.DriverName())
 		updateStatements[md.ID] = stmt
 	}
 
@@ -193,7 +166,7 @@ func doDelete(ctx context.Context, ent Entity, db DB) error {
 
 	stmt, ok := deleteStatements[md.ID]
 	if !ok {
-		stmt = deleteStatement(ent, md, getDialect(db))
+		stmt = deleteStatement(ent, md, db.DriverName())
 		deleteStatements[md.ID] = stmt
 	}
 
@@ -201,18 +174,18 @@ func doDelete(ctx context.Context, ent Entity, db DB) error {
 	return errors.Wrapf(err, "delete entity %s", md.ID)
 }
 
-func selectStatement(ent Entity, md *Metadata, dia *dialect) string {
+func selectStatement(ent Entity, md *Metadata, dirver string) string {
 	columns := []string{}
 	for _, col := range md.Columns {
-		columns = append(columns, quoteColumn(col.DBField, dia))
+		columns = append(columns, quoteColumn(col.DBField, dirver))
 	}
 	stmt := fmt.Sprintf("SELECT %s FROM %s WHERE", strings.Join(columns, ", "), md.TableName)
 
 	for i, col := range md.PrimaryKeys {
 		if i == 0 {
-			stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, dia), col.DBField)
+			stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, dirver), col.DBField)
 		} else {
-			stmt += fmt.Sprintf(" AND %s = :%s", quoteColumn(col.DBField, dia), col.DBField)
+			stmt += fmt.Sprintf(" AND %s = :%s", quoteColumn(col.DBField, dirver), col.DBField)
 		}
 	}
 	stmt += " LIMIT 1"
@@ -220,13 +193,13 @@ func selectStatement(ent Entity, md *Metadata, dia *dialect) string {
 	return stmt
 }
 
-func insertStatement(ent Entity, md *Metadata, dia *dialect) string {
+func insertStatement(ent Entity, md *Metadata, dirver string) string {
 	columns := []string{}
 	returnings := []string{}
 	placeholder := []string{}
 
 	for _, col := range md.Columns {
-		c := quoteColumn(col.DBField, dia)
+		c := quoteColumn(col.DBField, dirver)
 		if col.ReturningInsert {
 			returnings = append(returnings, c)
 		} else if !col.AutoIncrement {
@@ -249,19 +222,19 @@ func insertStatement(ent Entity, md *Metadata, dia *dialect) string {
 	return stmt
 }
 
-func updateStatement(ent Entity, md *Metadata, dia *dialect) string {
+func updateStatement(ent Entity, md *Metadata, dirver string) string {
 	returnings := []string{}
 	stmt := fmt.Sprintf("UPDATE %s SET", md.TableName)
 
 	set := false
 	for _, col := range md.Columns {
 		if col.ReturningUpdate {
-			returnings = append(returnings, quoteColumn(col.DBField, dia))
+			returnings = append(returnings, quoteColumn(col.DBField, dirver))
 		} else if !col.RefuseUpdate {
 			if set {
-				stmt += fmt.Sprintf(", %s = :%s", quoteColumn(col.DBField, dia), col.DBField)
+				stmt += fmt.Sprintf(", %s = :%s", quoteColumn(col.DBField, dirver), col.DBField)
 			} else {
-				stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, dia), col.DBField)
+				stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, dirver), col.DBField)
 				set = true
 			}
 		}
@@ -269,9 +242,9 @@ func updateStatement(ent Entity, md *Metadata, dia *dialect) string {
 
 	for i, col := range md.PrimaryKeys {
 		if i == 0 {
-			stmt += fmt.Sprintf(" WHERE %s = :%s", quoteColumn(col.DBField, dia), col.DBField)
+			stmt += fmt.Sprintf(" WHERE %s = :%s", quoteColumn(col.DBField, dirver), col.DBField)
 		} else {
-			stmt += fmt.Sprintf(" AND %s = :%s", quoteColumn(col.DBField, dia), col.DBField)
+			stmt += fmt.Sprintf(" AND %s = :%s", quoteColumn(col.DBField, dirver), col.DBField)
 		}
 	}
 
@@ -282,21 +255,21 @@ func updateStatement(ent Entity, md *Metadata, dia *dialect) string {
 	return stmt
 }
 
-func deleteStatement(ent Entity, md *Metadata, dia *dialect) string {
+func deleteStatement(ent Entity, md *Metadata, dirver string) string {
 	stmt := fmt.Sprintf("DELETE FROM %s WHERE", md.TableName)
 	for i, col := range md.PrimaryKeys {
 		if i == 0 {
-			stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, dia), col.DBField)
+			stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, dirver), col.DBField)
 		} else {
-			stmt += fmt.Sprintf(" AND %s = :%s", quoteColumn(col.DBField, dia), col.DBField)
+			stmt += fmt.Sprintf(" AND %s = :%s", quoteColumn(col.DBField, dirver), col.DBField)
 		}
 	}
 
 	return stmt
 }
 
-func quoteColumn(name string, dia *dialect) string {
-	if dia.Driver == "mysql" {
+func quoteColumn(name string, dirver string) string {
+	if dirver == "mysql" {
 		return fmt.Sprintf("`%s`", name)
 	}
 
