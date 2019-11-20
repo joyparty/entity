@@ -9,7 +9,7 @@
 ``` golang
 type User struct {
 	ID       int64 `db:"user_id" entity:"primaryKey,autoIncrement"`
-	CreateAt int64 `db:"create_at" entity:"refuseUpdate"`
+	CreateAt int64 `db:"create_at" entity:"refuseUpdate,returningInsert"`
 	UpdateAt int64 `db:"update_at"`
 	Other    bool  `db:"other" entity:"deprecated"`
 }
@@ -24,5 +24,7 @@ type User struct {
 - `primaryKey` 主键字段，每个实体对象至少要声明一个
 - `refuseUpdate` 不允许更新，UPDATE时会被忽略
 - `autoIncrement` 自增长主键，构造INSERT时此字段会被忽略
-- `returning` 如果数据库支持`RETURNING`特性，构造INSERT和UPDATE是，此字段的结果会放在`RETURNING`子句内返回
+- `returningInsert` insert时，这个字段会被放到`RETURNING`子句内返回，无论使用的数据库是否支持`RETURNING`
+- `returningUpdate` update时，这个字段会被放到`RETURNING`子句内返回，无论使用的数据库是否支持`RETURNING`
+- `returning` 等于同时使用`returningInsert`和`returningUpdate`
 - `deprecated` 标记为废弃，构造CRUD查询时会被忽略掉
