@@ -311,10 +311,9 @@ func deleteStatement(ent Entity, md *Metadata, dia *dialect) string {
 }
 
 func quoteColumn(name string, dia *dialect) string {
-	dn := dia.Driver
-	if dn == "postgres" {
-		return fmt.Sprintf("%q", name)
+	if dia.Driver == "mysql" {
+		return fmt.Sprintf("`%s`", name)
 	}
 
-	return fmt.Sprintf("`%s`", name)
+	return fmt.Sprintf("%q", name)
 }
