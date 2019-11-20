@@ -63,34 +63,7 @@ func getDialect(db DB) *dialect {
 	return dia
 }
 
-// Load 从数据库载入entity
-func Load(ctx context.Context, ent Entity, db DB) error {
-	ctx, cancel := context.WithTimeout(ctx, ReadTimeout)
-	defer cancel()
-
-	cv, cacheable := ent.(Cacheable)
-	if cacheable {
-		if loaded, err := loadCache(cv); err != nil {
-			return errors.WithMessage(err, "load entity from cache")
-		} else if loaded {
-			return nil
-		}
-	}
-
-	if err := load(ctx, ent, db); err != nil {
-		return errors.WithMessage(err, "load entity from db")
-	}
-
-	if cacheable {
-		if err := SaveCache(cv); err != nil {
-			return errors.WithMessage(err, "found entity")
-		}
-	}
-
-	return nil
-}
-
-func load(ctx context.Context, ent Entity, db DB) error {
+func doLoad(ctx context.Context, ent Entity, db DB) error {
 	md, err := getMetadata(ent)
 	if err != nil {
 		return err
@@ -119,28 +92,7 @@ func load(ctx context.Context, ent Entity, db DB) error {
 	return errors.WithStack(rows.Err())
 }
 
-// Insert 插入新entity
-func Insert(ctx context.Context, ent Entity, db DB) (int64, error) {
-	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
-	defer cancel()
-
-	if err := ent.OnEntityEvent(ctx, EventBeforeInsert); err != nil {
-		return 0, errors.WithMessage(err, "before insert entity")
-	}
-
-	lastID, err := insert(ctx, ent, db)
-	if err != nil {
-		return 0, errors.WithMessage(err, "insert entity")
-	}
-
-	if err := ent.OnEntityEvent(ctx, EventAfterInsert); err != nil {
-		return 0, errors.WithMessage(err, "after insert entity")
-	}
-
-	return lastID, nil
-}
-
-func insert(ctx context.Context, ent Entity, db DB) (int64, error) {
+func doInsert(ctx context.Context, ent Entity, db DB) (int64, error) {
 	md, err := getMetadata(ent)
 	if err != nil {
 		return 0, err
@@ -186,32 +138,7 @@ func insert(ctx context.Context, ent Entity, db DB) (int64, error) {
 	return lastID, errors.WithStack(err)
 }
 
-// Update 更新entity
-func Update(ctx context.Context, ent Entity, db DB) error {
-	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
-	defer cancel()
-
-	if err := ent.OnEntityEvent(ctx, EventBeforeUpdate); err != nil {
-		return errors.WithMessage(err, "before update entity")
-	}
-
-	if err := update(ctx, ent, db); err != nil {
-		return errors.WithMessage(err, "update entity")
-	}
-
-	if v, ok := ent.(Cacheable); ok {
-		if err := DeleteCache(v); err != nil {
-			return errors.WithMessage(err, "after update entity")
-		}
-	}
-
-	return errors.WithMessage(
-		ent.OnEntityEvent(ctx, EventAfterUpdate),
-		"after update entity",
-	)
-}
-
-func update(ctx context.Context, ent Entity, db DB) error {
+func doUpdate(ctx context.Context, ent Entity, db DB) error {
 	md, err := getMetadata(ent)
 	if err != nil {
 		return err
@@ -257,32 +184,7 @@ func update(ctx context.Context, ent Entity, db DB) error {
 	return nil
 }
 
-// Delete 删除entity
-func Delete(ctx context.Context, ent Entity, db DB) error {
-	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
-	defer cancel()
-
-	if err := ent.OnEntityEvent(ctx, EventBeforeDelete); err != nil {
-		return err
-	}
-
-	if err := _delete(ctx, ent, db); err != nil {
-		return err
-	}
-
-	if v, ok := ent.(Cacheable); ok {
-		if err := DeleteCache(v); err != nil {
-			return errors.WithMessage(err, "after delete entity")
-		}
-	}
-
-	return errors.WithMessage(
-		ent.OnEntityEvent(ctx, EventAfterDelete),
-		"after delete entity",
-	)
-}
-
-func _delete(ctx context.Context, ent Entity, db DB) error {
+func doDelete(ctx context.Context, ent Entity, db DB) error {
 	md, err := getMetadata(ent)
 	if err != nil {
 		return errors.WithMessage(err, "delete entity")
