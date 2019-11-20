@@ -186,18 +186,18 @@ func doDelete(ctx context.Context, ent Entity, db DB) error {
 	return errors.Wrapf(err, "delete entity %s", md.ID)
 }
 
-func selectStatement(ent Entity, md *Metadata, dirver string) string {
+func selectStatement(ent Entity, md *Metadata, driver string) string {
 	columns := []string{}
 	for _, col := range md.Columns {
-		columns = append(columns, quoteColumn(col.DBField, dirver))
+		columns = append(columns, quoteColumn(col.DBField, driver))
 	}
 	stmt := fmt.Sprintf("SELECT %s FROM %s WHERE", strings.Join(columns, ", "), md.TableName)
 
 	for i, col := range md.PrimaryKeys {
 		if i == 0 {
-			stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, dirver), col.DBField)
+			stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, driver), col.DBField)
 		} else {
-			stmt += fmt.Sprintf(" AND %s = :%s", quoteColumn(col.DBField, dirver), col.DBField)
+			stmt += fmt.Sprintf(" AND %s = :%s", quoteColumn(col.DBField, driver), col.DBField)
 		}
 	}
 	stmt += " LIMIT 1"
@@ -205,13 +205,13 @@ func selectStatement(ent Entity, md *Metadata, dirver string) string {
 	return stmt
 }
 
-func insertStatement(ent Entity, md *Metadata, dirver string) string {
+func insertStatement(ent Entity, md *Metadata, driver string) string {
 	columns := []string{}
 	returnings := []string{}
 	placeholder := []string{}
 
 	for _, col := range md.Columns {
-		c := quoteColumn(col.DBField, dirver)
+		c := quoteColumn(col.DBField, driver)
 		if col.ReturningInsert {
 			returnings = append(returnings, c)
 		} else if !col.AutoIncrement {
@@ -234,19 +234,19 @@ func insertStatement(ent Entity, md *Metadata, dirver string) string {
 	return stmt
 }
 
-func updateStatement(ent Entity, md *Metadata, dirver string) string {
+func updateStatement(ent Entity, md *Metadata, driver string) string {
 	returnings := []string{}
 	stmt := fmt.Sprintf("UPDATE %s SET", md.TableName)
 
 	set := false
 	for _, col := range md.Columns {
 		if col.ReturningUpdate {
-			returnings = append(returnings, quoteColumn(col.DBField, dirver))
+			returnings = append(returnings, quoteColumn(col.DBField, driver))
 		} else if !col.RefuseUpdate {
 			if set {
-				stmt += fmt.Sprintf(", %s = :%s", quoteColumn(col.DBField, dirver), col.DBField)
+				stmt += fmt.Sprintf(", %s = :%s", quoteColumn(col.DBField, driver), col.DBField)
 			} else {
-				stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, dirver), col.DBField)
+				stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, driver), col.DBField)
 				set = true
 			}
 		}
@@ -254,9 +254,9 @@ func updateStatement(ent Entity, md *Metadata, dirver string) string {
 
 	for i, col := range md.PrimaryKeys {
 		if i == 0 {
-			stmt += fmt.Sprintf(" WHERE %s = :%s", quoteColumn(col.DBField, dirver), col.DBField)
+			stmt += fmt.Sprintf(" WHERE %s = :%s", quoteColumn(col.DBField, driver), col.DBField)
 		} else {
-			stmt += fmt.Sprintf(" AND %s = :%s", quoteColumn(col.DBField, dirver), col.DBField)
+			stmt += fmt.Sprintf(" AND %s = :%s", quoteColumn(col.DBField, driver), col.DBField)
 		}
 	}
 
@@ -267,21 +267,21 @@ func updateStatement(ent Entity, md *Metadata, dirver string) string {
 	return stmt
 }
 
-func deleteStatement(ent Entity, md *Metadata, dirver string) string {
+func deleteStatement(ent Entity, md *Metadata, driver string) string {
 	stmt := fmt.Sprintf("DELETE FROM %s WHERE", md.TableName)
 	for i, col := range md.PrimaryKeys {
 		if i == 0 {
-			stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, dirver), col.DBField)
+			stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, driver), col.DBField)
 		} else {
-			stmt += fmt.Sprintf(" AND %s = :%s", quoteColumn(col.DBField, dirver), col.DBField)
+			stmt += fmt.Sprintf(" AND %s = :%s", quoteColumn(col.DBField, driver), col.DBField)
 		}
 	}
 
 	return stmt
 }
 
-func quoteColumn(name string, dirver string) string {
-	if dirver == "mysql" {
+func quoteColumn(name string, driver string) string {
+	if driver == "mysql" {
 		return fmt.Sprintf("`%s`", name)
 	}
 
