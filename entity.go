@@ -243,9 +243,6 @@ func Update(ctx context.Context, ent Entity, db DB) error {
 	}
 
 	if err := doUpdate(ctx, ent, db); err != nil {
-		if isConflictError(db.DriverName(), err) {
-			return errors.Wrap(ErrConflict, "update entity")
-		}
 		return errors.WithMessage(err, "update entity")
 	}
 
