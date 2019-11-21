@@ -33,10 +33,11 @@ func TestMetadata(t *testing.T) {
 
 func TestColumns(t *testing.T) {
 	cases := map[string]struct {
-		primaryKey    bool
-		refuseUpdate  bool
-		autoIncrement bool
-		returning     bool
+		primaryKey      bool
+		refuseUpdate    bool
+		autoIncrement   bool
+		returningInsert bool
+		returningUpdate bool
 	}{
 		"id": {
 			primaryKey:    true,
@@ -49,10 +50,13 @@ func TestColumns(t *testing.T) {
 		},
 		"name": {},
 		"create_at": {
-			refuseUpdate: true,
+			refuseUpdate:    true,
+			returningInsert: true,
 		},
 		"version": {
-			returning: true,
+			returningInsert: true,
+			returningUpdate: true,
+			refuseUpdate:    true,
 		},
 	}
 
@@ -70,8 +74,10 @@ func TestColumns(t *testing.T) {
 			t.Fatalf("GenernalEntity column %q RefuseUpdate, Expected=%v, Actual=%v", col.DBField, expected.refuseUpdate, col.RefuseUpdate)
 		} else if expected.autoIncrement != col.AutoIncrement {
 			t.Fatalf("GenernalEntity column %q AutoIncrement, Expected=%v, Actual=%v", col.DBField, expected.autoIncrement, col.AutoIncrement)
-		} else if expected.returning != col.Returning {
-			t.Fatalf("GenernalEntity column %q Returning, Expected=%v, Actual=%v", col.DBField, expected.returning, col.Returning)
+		} else if expected.returningInsert != col.ReturningInsert {
+			t.Fatalf("GenernalEntity column %q ReturningInsert, Expected=%v, Actual=%v", col.DBField, expected.returningInsert, col.ReturningInsert)
+		} else if expected.returningUpdate != col.ReturningUpdate {
+			t.Fatalf("GenernalEntity column %q ReturningUpdate, Expected=%v, Actual=%v", col.DBField, expected.returningUpdate, col.ReturningUpdate)
 		}
 	}
 
@@ -86,7 +92,7 @@ type GenernalEntity struct {
 	ID             int       `db:"id" entity:"primaryKey,autoIncrement"`
 	ID2            int       `db:"id2" entity:"primaryKey"`
 	Name           string    `db:"name"`
-	CreateAt       time.Time `db:"create_at" entity:"refuseUpdate"`
+	CreateAt       time.Time `db:"create_at" entity:"refuseUpdate,returningInsert"`
 	Version        int       `db:"version" entity:"returning"`
 	Deprecated     bool      `db:"deprecated" entity:"deprecated"`
 	ExplicitIgnore bool      `db:"-"`

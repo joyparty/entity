@@ -15,8 +15,6 @@ var (
 	insertStatements = map[string]string{}
 	updateStatements = map[string]string{}
 	deleteStatements = map[string]string{}
-
-	dialects = map[string]*dialect{}
 )
 
 // DB 数据库接口
@@ -38,59 +36,23 @@ type DB interface {
 	BindNamed(string, interface{}) (string, []interface{}, error)
 }
 
-// dialect 数据库特性
-type dialect struct {
-	Driver    string
-	Returning bool
+func isConflictError(driver string, err error) bool {
+	s := errors.Cause(err).Error()
+	if isPostgres(driver) {
+		return strings.Contains(s, "duplicate key value violates unique constraint")
+	} else if driver == "mysql" {
+		return strings.Contains(s, "Duplicate entry")
+	} else if driver == "sqlite3" {
+		return strings.Contains(s, "UNIQUE constraint failed")
+	}
+	return false
 }
 
-func getDialect(db DB) *dialect {
-	driver := db.DriverName()
-	if driver == "pgx" {
-		driver = "postgres"
-	}
-
-	if v, ok := dialects[driver]; ok {
-		return v
-	}
-
-	dia := &dialect{Driver: driver}
-	if dia.Driver == "postgres" {
-		dia.Returning = true
-	}
-
-	dialects[dia.Driver] = dia
-	return dia
+func isPostgres(driver string) bool {
+	return driver == "pgx" || driver == "postgres"
 }
 
-// Load 从数据库载入entity
-func Load(ctx context.Context, ent Entity, db DB) error {
-	ctx, cancel := context.WithTimeout(ctx, ReadTimeout)
-	defer cancel()
-
-	cv, cacheable := ent.(Cacheable)
-	if cacheable {
-		if loaded, err := loadCache(cv); err != nil {
-			return errors.WithMessage(err, "load entity from cache")
-		} else if loaded {
-			return nil
-		}
-	}
-
-	if err := load(ctx, ent, db); err != nil {
-		return errors.WithMessage(err, "load entity from db")
-	}
-
-	if cacheable {
-		if err := SaveCache(cv); err != nil {
-			return errors.WithMessage(err, "found entity")
-		}
-	}
-
-	return nil
-}
-
-func load(ctx context.Context, ent Entity, db DB) error {
+func doLoad(ctx context.Context, ent Entity, db DB) error {
 	md, err := getMetadata(ent)
 	if err != nil {
 		return err
@@ -98,7 +60,7 @@ func load(ctx context.Context, ent Entity, db DB) error {
 
 	stmt, ok := selectStatements[md.ID]
 	if !ok {
-		stmt = selectStatement(ent, md, getDialect(db))
+		stmt = selectStatement(ent, md, db.DriverName())
 		selectStatements[md.ID] = stmt
 	}
 
@@ -119,42 +81,19 @@ func load(ctx context.Context, ent Entity, db DB) error {
 	return errors.WithStack(rows.Err())
 }
 
-// Insert 插入新entity
-func Insert(ctx context.Context, ent Entity, db DB) (int64, error) {
-	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
-	defer cancel()
-
-	if err := ent.OnEntityEvent(ctx, EventBeforeInsert); err != nil {
-		return 0, errors.WithMessage(err, "before insert entity")
-	}
-
-	lastID, err := insert(ctx, ent, db)
-	if err != nil {
-		return 0, errors.WithMessage(err, "insert entity")
-	}
-
-	if err := ent.OnEntityEvent(ctx, EventAfterInsert); err != nil {
-		return 0, errors.WithMessage(err, "after insert entity")
-	}
-
-	return lastID, nil
-}
-
-func insert(ctx context.Context, ent Entity, db DB) (int64, error) {
+func doInsert(ctx context.Context, ent Entity, db DB) (int64, error) {
 	md, err := getMetadata(ent)
 	if err != nil {
 		return 0, err
 	}
 
-	dia := getDialect(db)
-
 	stmt, ok := insertStatements[md.ID]
 	if !ok {
-		stmt = insertStatement(ent, md, dia)
+		stmt = insertStatement(ent, md, db.DriverName())
 		insertStatements[md.ID] = stmt
 	}
 
-	if dia.Returning && strings.Contains(stmt, ") RETURNING ") {
+	if md.hasReturningInsert {
 		rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
 		if err != nil {
 			return 0, errors.WithStack(err)
@@ -178,7 +117,7 @@ func insert(ctx context.Context, ent Entity, db DB) (int64, error) {
 	}
 
 	// postgresql不支持LastInsertId特性
-	if db.DriverName() == "pgx" || db.DriverName() == "postgres" {
+	if isPostgres(db.DriverName()) {
 		return 0, nil
 	}
 
@@ -186,46 +125,19 @@ func insert(ctx context.Context, ent Entity, db DB) (int64, error) {
 	return lastID, errors.WithStack(err)
 }
 
-// Update 更新entity
-func Update(ctx context.Context, ent Entity, db DB) error {
-	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
-	defer cancel()
-
-	if err := ent.OnEntityEvent(ctx, EventBeforeUpdate); err != nil {
-		return errors.WithMessage(err, "before update entity")
-	}
-
-	if err := update(ctx, ent, db); err != nil {
-		return errors.WithMessage(err, "update entity")
-	}
-
-	if v, ok := ent.(Cacheable); ok {
-		if err := DeleteCache(v); err != nil {
-			return errors.WithMessage(err, "after update entity")
-		}
-	}
-
-	return errors.WithMessage(
-		ent.OnEntityEvent(ctx, EventAfterUpdate),
-		"after update entity",
-	)
-}
-
-func update(ctx context.Context, ent Entity, db DB) error {
+func doUpdate(ctx context.Context, ent Entity, db DB) error {
 	md, err := getMetadata(ent)
 	if err != nil {
 		return err
 	}
 
-	dia := getDialect(db)
-
 	stmt, ok := updateStatements[md.ID]
 	if !ok {
-		stmt = updateStatement(ent, md, dia)
+		stmt = updateStatement(ent, md, db.DriverName())
 		updateStatements[md.ID] = stmt
 	}
 
-	if dia.Returning && strings.Contains(stmt, " RETURNING ") {
+	if md.hasReturningUpdate {
 		rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
 		if err != nil {
 			return errors.WithStack(err)
@@ -255,34 +167,10 @@ func update(ctx context.Context, ent Entity, db DB) error {
 	}
 
 	return nil
+
 }
 
-// Delete 删除entity
-func Delete(ctx context.Context, ent Entity, db DB) error {
-	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
-	defer cancel()
-
-	if err := ent.OnEntityEvent(ctx, EventBeforeDelete); err != nil {
-		return err
-	}
-
-	if err := _delete(ctx, ent, db); err != nil {
-		return err
-	}
-
-	if v, ok := ent.(Cacheable); ok {
-		if err := DeleteCache(v); err != nil {
-			return errors.WithMessage(err, "after delete entity")
-		}
-	}
-
-	return errors.WithMessage(
-		ent.OnEntityEvent(ctx, EventAfterDelete),
-		"after delete entity",
-	)
-}
-
-func _delete(ctx context.Context, ent Entity, db DB) error {
+func doDelete(ctx context.Context, ent Entity, db DB) error {
 	md, err := getMetadata(ent)
 	if err != nil {
 		return errors.WithMessage(err, "delete entity")
@@ -290,7 +178,7 @@ func _delete(ctx context.Context, ent Entity, db DB) error {
 
 	stmt, ok := deleteStatements[md.ID]
 	if !ok {
-		stmt = deleteStatement(ent, md, getDialect(db))
+		stmt = deleteStatement(ent, md, db.DriverName())
 		deleteStatements[md.ID] = stmt
 	}
 
@@ -298,18 +186,18 @@ func _delete(ctx context.Context, ent Entity, db DB) error {
 	return errors.Wrapf(err, "delete entity %s", md.ID)
 }
 
-func selectStatement(ent Entity, md *Metadata, dia *dialect) string {
+func selectStatement(ent Entity, md *Metadata, driver string) string {
 	columns := []string{}
 	for _, col := range md.Columns {
-		columns = append(columns, quoteColumn(col.DBField, dia))
+		columns = append(columns, quoteColumn(col.DBField, driver))
 	}
 	stmt := fmt.Sprintf("SELECT %s FROM %s WHERE", strings.Join(columns, ", "), md.TableName)
 
 	for i, col := range md.PrimaryKeys {
 		if i == 0 {
-			stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, dia), col.DBField)
+			stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, driver), col.DBField)
 		} else {
-			stmt += fmt.Sprintf(" AND %s = :%s", quoteColumn(col.DBField, dia), col.DBField)
+			stmt += fmt.Sprintf(" AND %s = :%s", quoteColumn(col.DBField, driver), col.DBField)
 		}
 	}
 	stmt += " LIMIT 1"
@@ -317,23 +205,16 @@ func selectStatement(ent Entity, md *Metadata, dia *dialect) string {
 	return stmt
 }
 
-func insertStatement(ent Entity, md *Metadata, dia *dialect) string {
+func insertStatement(ent Entity, md *Metadata, driver string) string {
 	columns := []string{}
 	returnings := []string{}
 	placeholder := []string{}
 
 	for _, col := range md.Columns {
-		c := quoteColumn(col.DBField, dia)
-		returing := dia.Returning && col.Returning
-		if returing {
+		c := quoteColumn(col.DBField, driver)
+		if col.ReturningInsert {
 			returnings = append(returnings, c)
-		}
-
-		if col.AutoIncrement {
-			continue
-		}
-
-		if !returing {
+		} else if !col.AutoIncrement {
 			columns = append(columns, c)
 			placeholder = append(placeholder, fmt.Sprintf(":%s", col.DBField))
 		}
@@ -346,30 +227,26 @@ func insertStatement(ent Entity, md *Metadata, dia *dialect) string {
 		strings.Join(placeholder, ", "),
 	)
 
-	if dia.Returning && len(returnings) > 0 {
+	if len(returnings) > 0 {
 		stmt += fmt.Sprintf(" RETURNING %s", strings.Join(returnings, ", "))
 	}
 
 	return stmt
 }
 
-func updateStatement(ent Entity, md *Metadata, dia *dialect) string {
+func updateStatement(ent Entity, md *Metadata, driver string) string {
 	returnings := []string{}
 	stmt := fmt.Sprintf("UPDATE %s SET", md.TableName)
 
 	set := false
 	for _, col := range md.Columns {
-		if col.RefuseUpdate {
-			continue
-		}
-
-		if dia.Returning && col.Returning {
-			returnings = append(returnings, quoteColumn(col.DBField, dia))
-		} else {
+		if col.ReturningUpdate {
+			returnings = append(returnings, quoteColumn(col.DBField, driver))
+		} else if !col.RefuseUpdate {
 			if set {
-				stmt += fmt.Sprintf(", %s = :%s", quoteColumn(col.DBField, dia), col.DBField)
+				stmt += fmt.Sprintf(", %s = :%s", quoteColumn(col.DBField, driver), col.DBField)
 			} else {
-				stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, dia), col.DBField)
+				stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, driver), col.DBField)
 				set = true
 			}
 		}
@@ -377,37 +254,36 @@ func updateStatement(ent Entity, md *Metadata, dia *dialect) string {
 
 	for i, col := range md.PrimaryKeys {
 		if i == 0 {
-			stmt += fmt.Sprintf(" WHERE %s = :%s", quoteColumn(col.DBField, dia), col.DBField)
+			stmt += fmt.Sprintf(" WHERE %s = :%s", quoteColumn(col.DBField, driver), col.DBField)
 		} else {
-			stmt += fmt.Sprintf(" AND %s = :%s", quoteColumn(col.DBField, dia), col.DBField)
+			stmt += fmt.Sprintf(" AND %s = :%s", quoteColumn(col.DBField, driver), col.DBField)
 		}
 	}
 
-	if dia.Returning && len(returnings) > 0 {
+	if len(returnings) > 0 {
 		stmt += fmt.Sprintf(" RETURNING %s", strings.Join(returnings, ", "))
 	}
 
 	return stmt
 }
 
-func deleteStatement(ent Entity, md *Metadata, dia *dialect) string {
+func deleteStatement(ent Entity, md *Metadata, driver string) string {
 	stmt := fmt.Sprintf("DELETE FROM %s WHERE", md.TableName)
 	for i, col := range md.PrimaryKeys {
 		if i == 0 {
-			stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, dia), col.DBField)
+			stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, driver), col.DBField)
 		} else {
-			stmt += fmt.Sprintf(" AND %s = :%s", quoteColumn(col.DBField, dia), col.DBField)
+			stmt += fmt.Sprintf(" AND %s = :%s", quoteColumn(col.DBField, driver), col.DBField)
 		}
 	}
 
 	return stmt
 }
 
-func quoteColumn(name string, dia *dialect) string {
-	dn := dia.Driver
-	if dn == "postgres" {
-		return fmt.Sprintf("%q", name)
+func quoteColumn(name string, driver string) string {
+	if driver == "mysql" {
+		return fmt.Sprintf("`%s`", name)
 	}
 
-	return fmt.Sprintf("`%s`", name)
+	return fmt.Sprintf("%q", name)
 }
