@@ -60,12 +60,7 @@ func TestColumns(t *testing.T) {
 		},
 	}
 
-	columns, err := getColumns(&GenernalEntity{})
-	if err != nil {
-		t.Fatalf("GenernalEntity column error, Expected=nil, Actual=%s", err.Error())
-	}
-
-	for _, col := range columns {
+	for _, col := range getColumns(&GenernalEntity{}) {
 		expected := cases[col.DBField]
 
 		if expected.primaryKey != col.PrimaryKey {
@@ -80,23 +75,15 @@ func TestColumns(t *testing.T) {
 			t.Fatalf("GenernalEntity column %q ReturningUpdate, Expected=%v, Actual=%v", col.DBField, expected.returningUpdate, col.ReturningUpdate)
 		}
 	}
-
-	_, err = getColumns(GenernalEntity{})
-	t.Log(err)
-	if err == nil {
-		t.Fatal(`GenernalEntity column, Expected non-pointer error, Actual=nil`)
-	}
 }
 
 type GenernalEntity struct {
-	ID             int       `db:"id" entity:"primaryKey,autoIncrement"`
-	ID2            int       `db:"id2" entity:"primaryKey"`
+	ID             int       `db:"id,primaryKey,autoIncrement"`
+	ID2            int       `db:"id2,primaryKey"`
 	Name           string    `db:"name"`
-	CreateAt       time.Time `db:"create_at" entity:"refuseUpdate,returningInsert"`
-	Version        int       `db:"version" entity:"returning"`
-	Deprecated     bool      `db:"deprecated" entity:"deprecated"`
+	CreateAt       time.Time `db:"create_at,refuseUpdate,returningInsert"`
+	Version        int       `db:"version,returning"`
 	ExplicitIgnore bool      `db:"-"`
-	ImplicitIgnore bool
 }
 
 func (ge GenernalEntity) TableName() string {
@@ -108,8 +95,8 @@ func (ge GenernalEntity) OnEntityEvent(ctx context.Context, ev Event) error {
 }
 
 type EmptyEntity struct {
-	ID   int
-	Name string
+	ID   int    `db:"-"`
+	Name string `db:"-"`
 }
 
 func (ee EmptyEntity) TableName() string {

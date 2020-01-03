@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx/reflectx"
@@ -38,6 +37,8 @@ var (
 	WriteTimeout = 3 * time.Second
 
 	entites = map[reflect.Type]*Metadata{}
+
+	mapper = reflectx.NewMapper("db")
 )
 
 // Event 存储事件
@@ -73,10 +74,7 @@ type Metadata struct {
 
 // NewMetadata 构造实体对象元数据
 func NewMetadata(ent Entity) (*Metadata, error) {
-	columns, err := getColumns(ent)
-	if err != nil {
-		return nil, errors.WithMessage(err, "entity metadata")
-	}
+	columns := getColumns(ent)
 
 	md := &Metadata{
 		Type:        reflectx.Deref(reflect.TypeOf(ent)),
@@ -123,58 +121,40 @@ func getMetadata(ent Entity) (*Metadata, error) {
 	return md, nil
 }
 
-func getColumns(ent Entity) ([]Column, error) {
+func getColumns(ent Entity) []Column {
+	sm := mapper.TypeMap(reflectx.Deref(reflect.TypeOf(ent)))
+
 	cols := []Column{}
-
-	rt := reflect.TypeOf(ent)
-	if rt.Kind() != reflect.Ptr {
-		return nil, errors.Errorf("entity columns, non-pointer %s", rt.String())
-	}
-	rt = rt.Elem()
-
-	for i, len := 0, rt.NumField(); i < len; i++ {
-		field := rt.Field(i)
-		dbField := field.Tag.Get("db")
-		if dbField == "" || dbField == "-" {
-			continue
-		}
-
+	for _, fi := range sm.Names {
 		col := Column{
-			StructField: field.Name,
-			DBField:     dbField,
+			StructField: fi.Field.Name,
+			DBField:     fi.Name,
 		}
 
-		deprecated := false
-		tags := strings.Split(field.Tag.Get("entity"), ",")
-		for _, val := range tags {
-			val = strings.TrimSpace(val)
-			if val == "primaryKey" {
+		for key := range fi.Options {
+			if key == "primaryKey" {
 				col.PrimaryKey = true
 				col.RefuseUpdate = true
-			} else if val == "refuseUpdate" {
+			} else if key == "refuseUpdate" {
 				col.RefuseUpdate = true
-			} else if val == "returning" {
+			} else if key == "returning" {
 				col.ReturningInsert = true
 				col.ReturningUpdate = true
 				col.RefuseUpdate = true
-			} else if val == "returningInsert" {
+			} else if key == "returningInsert" {
 				col.ReturningInsert = true
-			} else if val == "returningUpdate" {
+			} else if key == "returningUpdate" {
 				col.ReturningUpdate = true
 				col.RefuseUpdate = true
-			} else if val == "autoIncrement" {
+			} else if key == "autoIncrement" {
 				col.AutoIncrement = true
 				col.RefuseUpdate = true
-			} else if val == "deprecated" {
-				deprecated = true
 			}
 		}
-
-		if !deprecated {
-			cols = append(cols, col)
-		}
+		cols = append(cols, col)
 	}
-	return cols, nil
+
+	return cols
 }
 
 // Load 从数据库载入entity
