@@ -141,21 +141,21 @@ func getColumns(ent Entity) []Column {
 		}
 
 		for key := range fi.Options {
-			if key == "primaryKey" {
+			if key == "primaryKey" || key == "primary_key" {
 				col.PrimaryKey = true
 				col.RefuseUpdate = true
-			} else if key == "refuseUpdate" {
+			} else if key == "refuseUpdate" || key == "refuse_update" {
 				col.RefuseUpdate = true
 			} else if key == "returning" {
 				col.ReturningInsert = true
 				col.ReturningUpdate = true
 				col.RefuseUpdate = true
-			} else if key == "returningInsert" {
+			} else if key == "returningInsert" || key == "returning_insert" {
 				col.ReturningInsert = true
-			} else if key == "returningUpdate" {
+			} else if key == "returningUpdate" || key == "returning_update" {
 				col.ReturningUpdate = true
 				col.RefuseUpdate = true
-			} else if key == "autoIncrement" {
+			} else if key == "autoIncrement" || key == "auto_increment" {
 				col.AutoIncrement = true
 				col.RefuseUpdate = true
 			}
