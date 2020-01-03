@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/jmoiron/sqlx/reflectx"
@@ -36,7 +37,8 @@ var (
 	// WriteTimeout 写入entity数据的默认超时时间
 	WriteTimeout = 3 * time.Second
 
-	entites = map[reflect.Type]*Metadata{}
+	entities    = map[reflect.Type]*Metadata{}
+	entitiesMux sync.RWMutex
 
 	mapper = reflectx.NewMapper("db")
 )
@@ -108,16 +110,23 @@ func NewMetadata(ent Entity) (*Metadata, error) {
 
 func getMetadata(ent Entity) (*Metadata, error) {
 	t := reflectx.Deref(reflect.TypeOf(ent))
-	if md, ok := entites[t]; ok {
+
+	entitiesMux.RLock()
+	md, ok := entities[t]
+	entitiesMux.RUnlock()
+	if ok {
 		return md, nil
 	}
+
+	entitiesMux.Lock()
+	defer entitiesMux.Unlock()
 
 	md, err := NewMetadata(ent)
 	if err != nil {
 		return nil, err
 	}
 
-	entites[t] = md
+	entities[t] = md
 	return md, nil
 }
 
