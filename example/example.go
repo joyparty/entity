@@ -26,14 +26,15 @@ var (
 // 	entity.WriteTimeout = 5 * time.Second
 // }
 
-func main() {}
+func main() {
+}
 
 // User 用户实体
 type User struct {
-	ID       int64 `db:"user_id" entity:"primaryKey,autoIncrement"`
-	CreateAt int64 `db:"create_at" entity:"refuseUpdate"`
+	ID       int64 `db:"user_id,primaryKey,autoIncrement"`
+	CreateAt int64 `db:"create_at,refuseUpdate"`
 	UpdateAt int64 `db:"update_at"`
-	Other    bool  `db:"other" entity:"deprecated"`
+	Other    bool  `db:"-"`
 }
 
 // TableName 返回数据库表名，entity.Entity接口方法

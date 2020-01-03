@@ -8,16 +8,16 @@
 
 ``` golang
 type User struct {
-	ID       int64 `db:"user_id" entity:"primaryKey,autoIncrement"`
-	CreateAt int64 `db:"create_at" entity:"refuseUpdate,returningInsert"`
+	ID       int64 `db:"user_id,primaryKey,autoIncrement"`
+	CreateAt int64 `db:"create_at,refuseUpdate,returningInsert"`
 	UpdateAt int64 `db:"update_at"`
-	Other    bool  `db:"other" entity:"deprecated"`
+	Other    bool  `db:"-"`
 }
 ```
 
 每个字段属性，必须声明`db`，否则不会作为字段对待
 
-实体配置，写在`entity`内
+实体配置，写在`db`内
 
 可用tag:
 
