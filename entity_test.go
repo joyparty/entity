@@ -23,9 +23,9 @@ func TestMetadata(t *testing.T) {
 	}
 
 	if n := len(md.PrimaryKeys); n != 2 {
-		t.Fatalf(`GenernalEntity metadata primary key, Expected=1, Actual=%d`, n)
-	} else if n := len(md.Columns); n != 5 {
-		t.Fatalf(`GenernalEntity metadata columns, Expected=4, Actual=%d`, n)
+		t.Fatalf(`GenernalEntity metadata primary key, Expected=2, Actual=%d`, n)
+	} else if n := len(md.Columns); n != 6 {
+		t.Fatalf(`GenernalEntity metadata columns, Expected=6, Actual=%d`, n)
 	} else if v := (&GenernalEntity{}).TableName(); md.TableName != v {
 		t.Fatalf(`GenernalEntity metadata tablename, Expected=%q, Actual=%q`, v, md.TableName)
 	}
@@ -58,10 +58,14 @@ func TestColumns(t *testing.T) {
 			returningUpdate: true,
 			refuseUpdate:    true,
 		},
+		"extra": {},
 	}
 
 	for _, col := range getColumns(&GenernalEntity{}) {
-		expected := cases[col.DBField]
+		expected, ok := cases[col.DBField]
+		if !ok {
+			t.Fatalf("got column '%s' that expections does not point out", col.DBField)
+		}
 
 		if expected.primaryKey != col.PrimaryKey {
 			t.Fatalf("GenernalEntity column %q PrimaryKey, Expected=%v, Actual=%v", col.DBField, expected.primaryKey, col.PrimaryKey)
@@ -77,12 +81,18 @@ func TestColumns(t *testing.T) {
 	}
 }
 
+type TestExtra struct {
+	E1 string `json:"e1"`
+	E2 int    `json:"e2"`
+}
+
 type GenernalEntity struct {
 	ID             int       `db:"id,primaryKey,autoIncrement"`
 	ID2            int       `db:"id2,primaryKey"`
 	Name           string    `db:"name"`
 	CreateAt       time.Time `db:"create_at,refuseUpdate,returningInsert"`
 	Version        int       `db:"version,returning"`
+	Extra          TestExtra `db:"extra"`
 	ExplicitIgnore bool      `db:"-"`
 }
 

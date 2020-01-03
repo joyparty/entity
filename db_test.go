@@ -10,13 +10,13 @@ func TestStatement(t *testing.T) {
 		md, _ := newTestMetadata(&GenernalEntity{})
 
 		stmt := selectStatement(&GenernalEntity{}, md, "mysql")
-		expected := "SELECT `create_at`, `id`, `id2`, `name`, `version` FROM genernal WHERE `id` = :id AND `id2` = :id2 LIMIT 1"
+		expected := "SELECT `create_at`, `extra`, `id`, `id2`, `name`, `version` FROM genernal WHERE `id` = :id AND `id2` = :id2 LIMIT 1"
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
 
 		stmt = selectStatement(&GenernalEntity{}, md, "postgres")
-		expected = `SELECT "create_at", "id", "id2", "name", "version" FROM genernal WHERE "id" = :id AND "id2" = :id2 LIMIT 1`
+		expected = `SELECT "create_at", "extra", "id", "id2", "name", "version" FROM genernal WHERE "id" = :id AND "id2" = :id2 LIMIT 1`
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
@@ -26,13 +26,13 @@ func TestStatement(t *testing.T) {
 		md, _ := newTestMetadata(&GenernalEntity{})
 
 		stmt := insertStatement(&GenernalEntity{}, md, "mysql")
-		expected := "INSERT INTO genernal (`id2`, `name`) VALUES (:id2, :name) RETURNING `create_at`, `version`"
+		expected := "INSERT INTO genernal (`extra`, `id2`, `name`) VALUES (:id2, :name) RETURNING `create_at`, `version`"
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
 
 		stmt = insertStatement(&GenernalEntity{}, md, "postgres")
-		expected = `INSERT INTO genernal ("id2", "name") VALUES (:id2, :name) RETURNING "create_at", "version"`
+		expected = `INSERT INTO genernal ("extra", "id2", "name") VALUES (:id2, :name) RETURNING "create_at", "version"`
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
@@ -42,13 +42,13 @@ func TestStatement(t *testing.T) {
 		md, _ := newTestMetadata(&GenernalEntity{})
 
 		stmt := updateStatement(&GenernalEntity{}, md, "mysql")
-		expected := "UPDATE genernal SET `name` = :name WHERE `id` = :id AND `id2` = :id2 RETURNING `version`"
+		expected := "UPDATE genernal SET `extra` = :extra, `name` = :name WHERE `id` = :id AND `id2` = :id2 RETURNING `version`"
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
 
 		stmt = updateStatement(&GenernalEntity{}, md, "postgres")
-		expected = `UPDATE genernal SET "name" = :name WHERE "id" = :id AND "id2" = :id2 RETURNING "version"`
+		expected = `UPDATE genernal SET "extra" = :extra, "name" = :name WHERE "id" = :id AND "id2" = :id2 RETURNING "version"`
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
