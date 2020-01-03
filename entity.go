@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jmoiron/sqlx/reflectx"
 	"github.com/pkg/errors"
 )
 
@@ -36,7 +37,7 @@ var (
 	// WriteTimeout 写入entity数据的默认超时时间
 	WriteTimeout = 3 * time.Second
 
-	entites = map[string]*Metadata{}
+	entites = map[reflect.Type]*Metadata{}
 )
 
 // Event 存储事件
@@ -61,7 +62,7 @@ type Column struct {
 
 // Metadata 元数据
 type Metadata struct {
-	ID          string
+	Type        reflect.Type
 	TableName   string
 	Columns     []Column
 	PrimaryKeys []Column
@@ -77,16 +78,15 @@ func NewMetadata(ent Entity) (*Metadata, error) {
 		return nil, errors.WithMessage(err, "entity metadata")
 	}
 
-	id := entityID(ent)
 	md := &Metadata{
-		ID:          id,
+		Type:        reflectx.Deref(reflect.TypeOf(ent)),
 		TableName:   ent.TableName(),
 		Columns:     columns,
 		PrimaryKeys: []Column{},
 	}
 
 	if len(md.Columns) == 0 {
-		return nil, errors.Errorf("empty entity %q", id)
+		return nil, errors.Errorf("empty entity %q", md.Type)
 	}
 
 	for _, col := range md.Columns {
@@ -102,15 +102,15 @@ func NewMetadata(ent Entity) (*Metadata, error) {
 	}
 
 	if len(md.PrimaryKeys) == 0 {
-		return nil, errors.Errorf("undefined entity %q primary key", id)
+		return nil, errors.Errorf("undefined entity %q primary key", md.Type)
 	}
 
 	return md, nil
 }
 
 func getMetadata(ent Entity) (*Metadata, error) {
-	id := entityID(ent)
-	if md, ok := entites[id]; ok {
+	t := reflectx.Deref(reflect.TypeOf(ent))
+	if md, ok := entites[t]; ok {
 		return md, nil
 	}
 
@@ -119,7 +119,7 @@ func getMetadata(ent Entity) (*Metadata, error) {
 		return nil, err
 	}
 
-	entites[id] = md
+	entites[t] = md
 	return md, nil
 }
 
@@ -175,11 +175,6 @@ func getColumns(ent Entity) ([]Column, error) {
 		}
 	}
 	return cols, nil
-}
-
-func entityID(ent Entity) string {
-	v := reflect.TypeOf(ent).Elem()
-	return fmt.Sprintf("%s.%s", v.PkgPath(), v.Name())
 }
 
 // Load 从数据库载入entity
