@@ -26,13 +26,13 @@ func TestStatement(t *testing.T) {
 		md, _ := newTestMetadata(&GenernalEntity{})
 
 		stmt := insertStatement(&GenernalEntity{}, md, "mysql")
-		expected := "INSERT INTO genernal (`extra`, `id2`, `name`) VALUES (:id2, :name) RETURNING `create_at`, `version`"
+		expected := "INSERT INTO genernal (`extra`, `id2`, `name`) VALUES (:extra, :id2, :name) RETURNING `create_at`, `version`"
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
 
 		stmt = insertStatement(&GenernalEntity{}, md, "postgres")
-		expected = `INSERT INTO genernal ("extra", "id2", "name") VALUES (:id2, :name) RETURNING "create_at", "version"`
+		expected = `INSERT INTO genernal ("extra", "id2", "name") VALUES (:extra, :id2, :name) RETURNING "create_at", "version"`
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
