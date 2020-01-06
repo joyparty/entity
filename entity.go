@@ -135,6 +135,10 @@ func getColumns(ent Entity) []Column {
 
 	cols := []Column{}
 	for _, fi := range sm.Names {
+		if fi.Parent.Path != "" {
+			continue
+		}
+
 		col := Column{
 			StructField: fi.Field.Name,
 			DBField:     fi.Name,
