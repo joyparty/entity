@@ -134,7 +134,7 @@ func getColumns(ent Entity) []Column { // revive:disable-line
 	sm := mapper.TypeMap(reflectx.Deref(reflect.TypeOf(ent)))
 
 	cols := []Column{}
-	for _, fi := range fields(sm.Tree) {
+	for _, fi := range getFields(sm.Tree) {
 		col := Column{
 			StructField: fi.Field.Name,
 			DBField:     fi.Name,
@@ -166,17 +166,18 @@ func getColumns(ent Entity) []Column { // revive:disable-line
 	return cols
 }
 
-func fields(node *reflectx.FieldInfo) []*reflectx.FieldInfo {
-	result := []*reflectx.FieldInfo{}
+// 从反射信息内，解析字段属性
+func getFields(node *reflectx.FieldInfo) []*reflectx.FieldInfo {
+	fields := []*reflectx.FieldInfo{}
 	for _, fi := range node.Children {
 		if fi == nil {
 			continue
 		}
 
 		if fi.Embedded {
-			result = append(result, fields(fi)...)
+			fields = append(fields, getFields(fi)...)
 		} else {
-			result = append(result, fi)
+			fields = append(fields, fi)
 		}
 	}
 
@@ -184,17 +185,17 @@ func fields(node *reflectx.FieldInfo) []*reflectx.FieldInfo {
 	if node.Parent == nil {
 		// replace duplicate name
 		filter := map[string]*reflectx.FieldInfo{}
-		for _, v := range result {
+		for _, v := range fields {
 			filter[v.Name] = v
 		}
 
-		result = result[:0]
+		fields = fields[:0]
 		for _, v := range filter {
-			result = append(result, v)
+			fields = append(fields, v)
 		}
 	}
 
-	return result
+	return fields
 }
 
 // Load 从数据库载入entity

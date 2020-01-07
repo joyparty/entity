@@ -2,8 +2,11 @@ package entity
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
+
+	"github.com/jmoiron/sqlx/reflectx"
 )
 
 func TestMetadata(t *testing.T) {
@@ -77,6 +80,76 @@ func TestColumns(t *testing.T) {
 			t.Fatalf("GenernalEntity column %q ReturningInsert, Expected=%v, Actual=%v", col.DBField, expected.returningInsert, col.ReturningInsert)
 		} else if expected.returningUpdate != col.ReturningUpdate {
 			t.Fatalf("GenernalEntity column %q ReturningUpdate, Expected=%v, Actual=%v", col.DBField, expected.returningUpdate, col.ReturningUpdate)
+		}
+	}
+}
+
+func TestFields(t *testing.T) {
+	type NestExtend struct {
+		Foo string `db:"foo"`
+		Bar bool   `db:"bar"`
+	}
+
+	type MoreNestExtend struct {
+		Foo int `db:"foo"`
+	}
+
+	type Other struct {
+		Baz string `json:"baz"`
+	}
+
+	type Extend struct {
+		NestExtend
+		MoreNestExtend
+		Name string `db:"name"`
+	}
+
+	type Row struct {
+		Extend
+		ID    int   `db:"id,primaryKey"`
+		Other Other `db:"other"`
+	}
+
+	vt := reflectx.Deref(reflect.TypeOf(&Row{}))
+	tm := reflectx.NewMapper("db").TypeMap(vt)
+
+	fs := map[string]*reflectx.FieldInfo{}
+	for _, v := range getFields(tm.Tree) {
+		fs[v.Name] = v
+	}
+
+	expected := map[string]struct {
+		TypeKind reflect.Kind
+	}{
+		"id": {
+			TypeKind: reflect.Int,
+		},
+		"name": {
+			TypeKind: reflect.String,
+		},
+		"other": {
+			TypeKind: reflect.Struct,
+		},
+		"foo": {
+			TypeKind: reflect.Int,
+		},
+		"bar": {
+			TypeKind: reflect.Bool,
+		},
+	}
+
+	if len(fs) != len(expected) {
+		t.Fatalf("fields count, Expected=%d, Actual=%d", len(expected), len(fs))
+	}
+
+	for name, info := range expected {
+		fi, ok := fs[name]
+		if !ok {
+			t.Fatalf("fields(), %q not found", name)
+		}
+
+		if fi.Field.Type.Kind() != info.TypeKind {
+			t.Fatalf("fields() %q type, Expected=%s, Actual=%s", name, info.TypeKind, fi.Field.Type.Kind())
 		}
 	}
 }
