@@ -130,15 +130,11 @@ func getMetadata(ent Entity) (*Metadata, error) {
 	return md, nil
 }
 
-func getColumns(ent Entity) []Column {
+func getColumns(ent Entity) []Column { // revive:disable-line
 	sm := mapper.TypeMap(reflectx.Deref(reflect.TypeOf(ent)))
 
 	cols := []Column{}
-	for _, fi := range sm.Names {
-		if fi.Parent.Path != "" {
-			continue
-		}
-
+	for _, fi := range fields(sm.Tree) {
 		col := Column{
 			StructField: fi.Field.Name,
 			DBField:     fi.Name,
@@ -168,6 +164,37 @@ func getColumns(ent Entity) []Column {
 	}
 
 	return cols
+}
+
+func fields(node *reflectx.FieldInfo) []*reflectx.FieldInfo {
+	result := []*reflectx.FieldInfo{}
+	for _, fi := range node.Children {
+		if fi == nil {
+			continue
+		}
+
+		if fi.Embedded {
+			result = append(result, fields(fi)...)
+		} else {
+			result = append(result, fi)
+		}
+	}
+
+	// root node
+	if node.Parent == nil {
+		// replace duplicate name
+		filter := map[string]*reflectx.FieldInfo{}
+		for _, v := range result {
+			filter[v.Name] = v
+		}
+
+		result = result[:0]
+		for _, v := range filter {
+			result = append(result, v)
+		}
+	}
+
+	return result
 }
 
 // Load 从数据库载入entity
