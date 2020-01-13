@@ -63,6 +63,10 @@ type Column struct {
 	ReturningUpdate bool
 }
 
+func (c Column) String() string {
+	return c.DBField
+}
+
 // Metadata 元数据
 type Metadata struct {
 	Type        reflect.Type
