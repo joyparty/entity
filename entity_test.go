@@ -2,8 +2,11 @@ package entity
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
+
+	"github.com/jmoiron/sqlx/reflectx"
 )
 
 func TestMetadata(t *testing.T) {
@@ -23,9 +26,9 @@ func TestMetadata(t *testing.T) {
 	}
 
 	if n := len(md.PrimaryKeys); n != 2 {
-		t.Fatalf(`GenernalEntity metadata primary key, Expected=1, Actual=%d`, n)
-	} else if n := len(md.Columns); n != 5 {
-		t.Fatalf(`GenernalEntity metadata columns, Expected=4, Actual=%d`, n)
+		t.Fatalf(`GenernalEntity metadata primary key, Expected=2, Actual=%d`, n)
+	} else if n := len(md.Columns); n != 6 {
+		t.Fatalf(`GenernalEntity metadata columns, Expected=6, Actual=%d`, n)
 	} else if v := (&GenernalEntity{}).TableName(); md.TableName != v {
 		t.Fatalf(`GenernalEntity metadata tablename, Expected=%q, Actual=%q`, v, md.TableName)
 	}
@@ -58,15 +61,14 @@ func TestColumns(t *testing.T) {
 			returningUpdate: true,
 			refuseUpdate:    true,
 		},
+		"extra": {},
 	}
 
-	columns, err := getColumns(&GenernalEntity{})
-	if err != nil {
-		t.Fatalf("GenernalEntity column error, Expected=nil, Actual=%s", err.Error())
-	}
-
-	for _, col := range columns {
-		expected := cases[col.DBField]
+	for _, col := range getColumns(&GenernalEntity{}) {
+		expected, ok := cases[col.DBField]
+		if !ok {
+			t.Fatalf("got column '%s' that expections does not point out", col.DBField)
+		}
 
 		if expected.primaryKey != col.PrimaryKey {
 			t.Fatalf("GenernalEntity column %q PrimaryKey, Expected=%v, Actual=%v", col.DBField, expected.primaryKey, col.PrimaryKey)
@@ -80,23 +82,91 @@ func TestColumns(t *testing.T) {
 			t.Fatalf("GenernalEntity column %q ReturningUpdate, Expected=%v, Actual=%v", col.DBField, expected.returningUpdate, col.ReturningUpdate)
 		}
 	}
+}
 
-	_, err = getColumns(GenernalEntity{})
-	t.Log(err)
-	if err == nil {
-		t.Fatal(`GenernalEntity column, Expected non-pointer error, Actual=nil`)
+func TestFields(t *testing.T) {
+	type NestExtend struct {
+		Foo string `db:"foo"`
+		Bar bool   `db:"bar"`
+	}
+
+	type MoreNestExtend struct {
+		Foo int `db:"foo"`
+	}
+
+	type Other struct {
+		Baz string `json:"baz"`
+	}
+
+	type Extend struct {
+		NestExtend
+		MoreNestExtend
+		Name string `db:"name"`
+	}
+
+	type Row struct {
+		Extend
+		ID    int   `db:"id,primaryKey"`
+		Other Other `db:"other"`
+	}
+
+	vt := reflectx.Deref(reflect.TypeOf(&Row{}))
+	tm := reflectx.NewMapper("db").TypeMap(vt)
+
+	fs := map[string]*reflectx.FieldInfo{}
+	for _, v := range getFields(tm.Tree) {
+		fs[v.Name] = v
+	}
+
+	expected := map[string]struct {
+		TypeKind reflect.Kind
+	}{
+		"id": {
+			TypeKind: reflect.Int,
+		},
+		"name": {
+			TypeKind: reflect.String,
+		},
+		"other": {
+			TypeKind: reflect.Struct,
+		},
+		"foo": {
+			TypeKind: reflect.Int,
+		},
+		"bar": {
+			TypeKind: reflect.Bool,
+		},
+	}
+
+	if len(fs) != len(expected) {
+		t.Fatalf("fields count, Expected=%d, Actual=%d", len(expected), len(fs))
+	}
+
+	for name, info := range expected {
+		fi, ok := fs[name]
+		if !ok {
+			t.Fatalf("fields(), %q not found", name)
+		}
+
+		if fi.Field.Type.Kind() != info.TypeKind {
+			t.Fatalf("fields() %q type, Expected=%s, Actual=%s", name, info.TypeKind, fi.Field.Type.Kind())
+		}
 	}
 }
 
+type TestExtra struct {
+	E1 string `json:"e1"`
+	E2 int    `json:"e2"`
+}
+
 type GenernalEntity struct {
-	ID             int       `db:"id" entity:"primaryKey,autoIncrement"`
-	ID2            int       `db:"id2" entity:"primaryKey"`
+	ID             int       `db:"id,primaryKey,autoIncrement"`
+	ID2            int       `db:"id2,primaryKey"`
 	Name           string    `db:"name"`
-	CreateAt       time.Time `db:"create_at" entity:"refuseUpdate,returningInsert"`
-	Version        int       `db:"version" entity:"returning"`
-	Deprecated     bool      `db:"deprecated" entity:"deprecated"`
+	CreateAt       time.Time `db:"create_at,refuseUpdate,returningInsert"`
+	Version        int       `db:"version,returning"`
+	Extra          TestExtra `db:"extra"`
 	ExplicitIgnore bool      `db:"-"`
-	ImplicitIgnore bool
 }
 
 func (ge GenernalEntity) TableName() string {
@@ -108,8 +178,8 @@ func (ge GenernalEntity) OnEntityEvent(ctx context.Context, ev Event) error {
 }
 
 type EmptyEntity struct {
-	ID   int
-	Name string
+	ID   int    `db:"-"`
+	Name string `db:"-"`
 }
 
 func (ee EmptyEntity) TableName() string {
