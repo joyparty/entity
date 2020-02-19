@@ -1,0 +1,20 @@
+stages:
+  - revive
+  - test
+
+revive:
+  image: reg.haochang.tv/base/golang:1.13.5
+  stage: revive
+  script:
+    - revive -config revive.toml -exclude ./vendor/... ./...
+  tags:
+    - docker-executer-runner  # 指定gitlab-runner执行器
+
+# 测试
+test:
+  image: reg.haochang.tv/base/golang:1.13.5
+  stage: test
+  script:
+    - go test ./...
+  tags:
+    - docker-executer-runner  # 指定gitlab-runner执行器

@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strings"
+	"sync"
 	"time"
 
+	"github.com/jmoiron/sqlx/reflectx"
 	"github.com/pkg/errors"
 )
 
@@ -36,7 +37,10 @@ var (
 	// WriteTimeout 写入entity数据的默认超时时间
 	WriteTimeout = 3 * time.Second
 
-	entites = map[string]*Metadata{}
+	entities    = map[reflect.Type]*Metadata{}
+	entitiesMux sync.RWMutex
+
+	mapper = reflectx.NewMapper("db")
 )
 
 // Event 存储事件
@@ -59,9 +63,13 @@ type Column struct {
 	ReturningUpdate bool
 }
 
+func (c Column) String() string {
+	return c.DBField
+}
+
 // Metadata 元数据
 type Metadata struct {
-	ID          string
+	Type        reflect.Type
 	TableName   string
 	Columns     []Column
 	PrimaryKeys []Column
@@ -72,21 +80,17 @@ type Metadata struct {
 
 // NewMetadata 构造实体对象元数据
 func NewMetadata(ent Entity) (*Metadata, error) {
-	columns, err := getColumns(ent)
-	if err != nil {
-		return nil, errors.WithMessage(err, "entity metadata")
-	}
+	columns := getColumns(ent)
 
-	id := entityID(ent)
 	md := &Metadata{
-		ID:          id,
+		Type:        reflectx.Deref(reflect.TypeOf(ent)),
 		TableName:   ent.TableName(),
 		Columns:     columns,
 		PrimaryKeys: []Column{},
 	}
 
 	if len(md.Columns) == 0 {
-		return nil, errors.Errorf("empty entity %q", id)
+		return nil, errors.Errorf("empty entity %q", md.Type)
 	}
 
 	for _, col := range md.Columns {
@@ -102,84 +106,100 @@ func NewMetadata(ent Entity) (*Metadata, error) {
 	}
 
 	if len(md.PrimaryKeys) == 0 {
-		return nil, errors.Errorf("undefined entity %q primary key", id)
+		return nil, errors.Errorf("undefined entity %q primary key", md.Type)
 	}
 
 	return md, nil
 }
 
 func getMetadata(ent Entity) (*Metadata, error) {
-	id := entityID(ent)
-	if md, ok := entites[id]; ok {
+	t := reflectx.Deref(reflect.TypeOf(ent))
+
+	entitiesMux.RLock()
+	md, ok := entities[t]
+	entitiesMux.RUnlock()
+	if ok {
 		return md, nil
 	}
+
+	entitiesMux.Lock()
+	defer entitiesMux.Unlock()
 
 	md, err := NewMetadata(ent)
 	if err != nil {
 		return nil, err
 	}
 
-	entites[id] = md
+	entities[t] = md
 	return md, nil
 }
 
-func getColumns(ent Entity) ([]Column, error) {
+func getColumns(ent Entity) []Column { // revive:disable-line
+	sm := mapper.TypeMap(reflectx.Deref(reflect.TypeOf(ent)))
+
 	cols := []Column{}
+	for _, fi := range getFields(sm.Tree) {
+		col := Column{
+			StructField: fi.Field.Name,
+			DBField:     fi.Name,
+		}
 
-	rt := reflect.TypeOf(ent)
-	if rt.Kind() != reflect.Ptr {
-		return nil, errors.Errorf("entity columns, non-pointer %s", rt.String())
+		for key := range fi.Options {
+			if key == "primaryKey" || key == "primary_key" {
+				col.PrimaryKey = true
+				col.RefuseUpdate = true
+			} else if key == "refuseUpdate" || key == "refuse_update" {
+				col.RefuseUpdate = true
+			} else if key == "returning" {
+				col.ReturningInsert = true
+				col.ReturningUpdate = true
+				col.RefuseUpdate = true
+			} else if key == "returningInsert" || key == "returning_insert" {
+				col.ReturningInsert = true
+			} else if key == "returningUpdate" || key == "returning_update" {
+				col.ReturningUpdate = true
+				col.RefuseUpdate = true
+			} else if key == "autoIncrement" || key == "auto_increment" {
+				col.AutoIncrement = true
+				col.RefuseUpdate = true
+			}
+		}
+		cols = append(cols, col)
 	}
-	rt = rt.Elem()
 
-	for i, len := 0, rt.NumField(); i < len; i++ {
-		field := rt.Field(i)
-		dbField := field.Tag.Get("db")
-		if dbField == "" || dbField == "-" {
+	return cols
+}
+
+// 从反射信息内，解析字段属性
+func getFields(node *reflectx.FieldInfo) []*reflectx.FieldInfo {
+	fields := []*reflectx.FieldInfo{}
+	for _, fi := range node.Children {
+		if fi == nil {
 			continue
 		}
 
-		col := Column{
-			StructField: field.Name,
-			DBField:     dbField,
-		}
-
-		deprecated := false
-		tags := strings.Split(field.Tag.Get("entity"), ",")
-		for _, val := range tags {
-			val = strings.TrimSpace(val)
-			if val == "primaryKey" {
-				col.PrimaryKey = true
-				col.RefuseUpdate = true
-			} else if val == "refuseUpdate" {
-				col.RefuseUpdate = true
-			} else if val == "returning" {
-				col.ReturningInsert = true
-				col.ReturningUpdate = true
-				col.RefuseUpdate = true
-			} else if val == "returningInsert" {
-				col.ReturningInsert = true
-			} else if val == "returningUpdate" {
-				col.ReturningUpdate = true
-				col.RefuseUpdate = true
-			} else if val == "autoIncrement" {
-				col.AutoIncrement = true
-				col.RefuseUpdate = true
-			} else if val == "deprecated" {
-				deprecated = true
-			}
-		}
-
-		if !deprecated {
-			cols = append(cols, col)
+		if fi.Embedded {
+			fields = append(fields, getFields(fi)...)
+		} else {
+			fields = append(fields, fi)
 		}
 	}
-	return cols, nil
-}
 
-func entityID(ent Entity) string {
-	v := reflect.TypeOf(ent).Elem()
-	return fmt.Sprintf("%s.%s", v.PkgPath(), v.Name())
+	// root node
+	if node.Parent == nil {
+		// replace duplicate name
+		filter := map[string]*reflectx.FieldInfo{}
+		for _, v := range fields {
+			filter[v.Name] = v
+		}
+
+		fields = fields[:0]
+		for _, v := range filter {
+			fields = append(fields, v)
+		}
+	}
+
+	return fields
 }
 
 // Load 从数据库载入entity

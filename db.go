@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
@@ -11,10 +12,10 @@ import (
 )
 
 var (
-	selectStatements = map[string]string{}
-	insertStatements = map[string]string{}
-	updateStatements = map[string]string{}
-	deleteStatements = map[string]string{}
+	selectStatements = map[reflect.Type]string{}
+	insertStatements = map[reflect.Type]string{}
+	updateStatements = map[reflect.Type]string{}
+	deleteStatements = map[reflect.Type]string{}
 )
 
 // DB 数据库接口
@@ -58,10 +59,10 @@ func doLoad(ctx context.Context, ent Entity, db DB) error {
 		return err
 	}
 
-	stmt, ok := selectStatements[md.ID]
+	stmt, ok := selectStatements[md.Type]
 	if !ok {
 		stmt = selectStatement(ent, md, db.DriverName())
-		selectStatements[md.ID] = stmt
+		selectStatements[md.Type] = stmt
 	}
 
 	rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
@@ -87,10 +88,10 @@ func doInsert(ctx context.Context, ent Entity, db DB) (int64, error) {
 		return 0, err
 	}
 
-	stmt, ok := insertStatements[md.ID]
+	stmt, ok := insertStatements[md.Type]
 	if !ok {
 		stmt = insertStatement(ent, md, db.DriverName())
-		insertStatements[md.ID] = stmt
+		insertStatements[md.Type] = stmt
 	}
 
 	if md.hasReturningInsert {
@@ -131,10 +132,10 @@ func doUpdate(ctx context.Context, ent Entity, db DB) error {
 		return err
 	}
 
-	stmt, ok := updateStatements[md.ID]
+	stmt, ok := updateStatements[md.Type]
 	if !ok {
 		stmt = updateStatement(ent, md, db.DriverName())
-		updateStatements[md.ID] = stmt
+		updateStatements[md.Type] = stmt
 	}
 
 	if md.hasReturningUpdate {
@@ -176,14 +177,14 @@ func doDelete(ctx context.Context, ent Entity, db DB) error {
 		return errors.WithMessage(err, "delete entity")
 	}
 
-	stmt, ok := deleteStatements[md.ID]
+	stmt, ok := deleteStatements[md.Type]
 	if !ok {
 		stmt = deleteStatement(ent, md, db.DriverName())
-		deleteStatements[md.ID] = stmt
+		deleteStatements[md.Type] = stmt
 	}
 
 	_, err = db.NamedExecContext(ctx, stmt, ent)
-	return errors.Wrapf(err, "delete entity %s", md.ID)
+	return errors.Wrapf(err, "delete entity %s", md.Type)
 }
 
 func selectStatement(ent Entity, md *Metadata, driver string) string {
