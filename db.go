@@ -192,7 +192,7 @@ func selectStatement(ent Entity, md *Metadata, driver string) string {
 	for _, col := range md.Columns {
 		columns = append(columns, quoteColumn(col.DBField, driver))
 	}
-	stmt := fmt.Sprintf("SELECT %s FROM %s WHERE", strings.Join(columns, ", "), md.TableName)
+	stmt := fmt.Sprintf("SELECT %s FROM %s WHERE", strings.Join(columns, ", "), quoteIdentifier(md.TableName, driver))
 
 	for i, col := range md.PrimaryKeys {
 		if i == 0 {
@@ -223,7 +223,7 @@ func insertStatement(ent Entity, md *Metadata, driver string) string {
 
 	stmt := fmt.Sprintf(
 		"INSERT INTO %s (%s) VALUES (%s)",
-		md.TableName,
+		quoteIdentifier(md.TableName, driver),
 		strings.Join(columns, ", "),
 		strings.Join(placeholder, ", "),
 	)
@@ -237,7 +237,7 @@ func insertStatement(ent Entity, md *Metadata, driver string) string {
 
 func updateStatement(ent Entity, md *Metadata, driver string) string {
 	returnings := []string{}
-	stmt := fmt.Sprintf("UPDATE %s SET", md.TableName)
+	stmt := fmt.Sprintf("UPDATE %s SET", quoteIdentifier(md.TableName, driver))
 
 	set := false
 	for _, col := range md.Columns {
@@ -269,7 +269,7 @@ func updateStatement(ent Entity, md *Metadata, driver string) string {
 }
 
 func deleteStatement(ent Entity, md *Metadata, driver string) string {
-	stmt := fmt.Sprintf("DELETE FROM %s WHERE", md.TableName)
+	stmt := fmt.Sprintf("DELETE FROM %s WHERE", quoteIdentifier(md.TableName, driver))
 	for i, col := range md.PrimaryKeys {
 		if i == 0 {
 			stmt += fmt.Sprintf(" %s = :%s", quoteColumn(col.DBField, driver), col.DBField)
@@ -287,4 +287,22 @@ func quoteColumn(name string, driver string) string {
 	}
 
 	return fmt.Sprintf("%q", name)
+}
+
+func quoteIdentifier(name string, driver string) string {
+	symbol := `"`
+	if driver == "mysql" {
+		symbol = "`"
+	}
+
+	result := []string{}
+	name = strings.ReplaceAll(name, symbol, "")
+	for _, s := range strings.Split(name, ".") {
+		if s != "*" {
+			s = fmt.Sprintf("%s%s%s", symbol, s, symbol)
+		}
+		result = append(result, s)
+	}
+
+	return strings.Join(result, ".")
 }

@@ -10,13 +10,13 @@ func TestStatement(t *testing.T) {
 		md, _ := newTestMetadata(&GenernalEntity{})
 
 		stmt := selectStatement(&GenernalEntity{}, md, "mysql")
-		expected := "SELECT `create_at`, `extra`, `id`, `id2`, `name`, `version` FROM genernal WHERE `id` = :id AND `id2` = :id2 LIMIT 1"
+		expected := "SELECT `create_at`, `extra`, `id`, `id2`, `name`, `version` FROM `genernal` WHERE `id` = :id AND `id2` = :id2 LIMIT 1"
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
 
 		stmt = selectStatement(&GenernalEntity{}, md, "postgres")
-		expected = `SELECT "create_at", "extra", "id", "id2", "name", "version" FROM genernal WHERE "id" = :id AND "id2" = :id2 LIMIT 1`
+		expected = `SELECT "create_at", "extra", "id", "id2", "name", "version" FROM "genernal" WHERE "id" = :id AND "id2" = :id2 LIMIT 1`
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
@@ -26,13 +26,13 @@ func TestStatement(t *testing.T) {
 		md, _ := newTestMetadata(&GenernalEntity{})
 
 		stmt := insertStatement(&GenernalEntity{}, md, "mysql")
-		expected := "INSERT INTO genernal (`extra`, `id2`, `name`) VALUES (:extra, :id2, :name) RETURNING `create_at`, `version`"
+		expected := "INSERT INTO `genernal` (`extra`, `id2`, `name`) VALUES (:extra, :id2, :name) RETURNING `create_at`, `version`"
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
 
 		stmt = insertStatement(&GenernalEntity{}, md, "postgres")
-		expected = `INSERT INTO genernal ("extra", "id2", "name") VALUES (:extra, :id2, :name) RETURNING "create_at", "version"`
+		expected = `INSERT INTO "genernal" ("extra", "id2", "name") VALUES (:extra, :id2, :name) RETURNING "create_at", "version"`
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
@@ -42,13 +42,13 @@ func TestStatement(t *testing.T) {
 		md, _ := newTestMetadata(&GenernalEntity{})
 
 		stmt := updateStatement(&GenernalEntity{}, md, "mysql")
-		expected := "UPDATE genernal SET `extra` = :extra, `name` = :name WHERE `id` = :id AND `id2` = :id2 RETURNING `version`"
+		expected := "UPDATE `genernal` SET `extra` = :extra, `name` = :name WHERE `id` = :id AND `id2` = :id2 RETURNING `version`"
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
 
 		stmt = updateStatement(&GenernalEntity{}, md, "postgres")
-		expected = `UPDATE genernal SET "extra" = :extra, "name" = :name WHERE "id" = :id AND "id2" = :id2 RETURNING "version"`
+		expected = `UPDATE "genernal" SET "extra" = :extra, "name" = :name WHERE "id" = :id AND "id2" = :id2 RETURNING "version"`
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
@@ -58,13 +58,13 @@ func TestStatement(t *testing.T) {
 		md, _ := newTestMetadata(&GenernalEntity{})
 
 		stmt := deleteStatement(&GenernalEntity{}, md, "mysql")
-		expected := "DELETE FROM genernal WHERE `id` = :id AND `id2` = :id2"
+		expected := "DELETE FROM `genernal` WHERE `id` = :id AND `id2` = :id2"
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
 
 		stmt = deleteStatement(&GenernalEntity{}, md, "postgres")
-		expected = `DELETE FROM genernal WHERE "id" = :id AND "id2" = :id2`
+		expected = `DELETE FROM "genernal" WHERE "id" = :id AND "id2" = :id2`
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
@@ -92,6 +92,46 @@ func TestQuoteColumn(t *testing.T) {
 	for _, test := range tests {
 		if actual := quoteColumn(test.column, test.driver); actual != test.expected {
 			t.Fatalf("%q quote column, Expected=%v, Actual=%v", test.driver, test.expected, actual)
+		}
+	}
+}
+
+func TestQuoteIdentifier(t *testing.T) {
+	cases := []struct {
+		driver     string
+		identifier string
+		expected   string
+	}{
+		{
+			driver:     "mysql",
+			identifier: "foobar",
+			expected:   "`foobar`",
+		},
+		{
+			driver:     "postgres",
+			identifier: "foobar",
+			expected:   `"foobar"`,
+		},
+		{
+			driver:     "postgres",
+			identifier: "foo.bar",
+			expected:   `"foo"."bar"`,
+		},
+		{
+			driver:     "postgres",
+			identifier: `"foo".bar`,
+			expected:   `"foo"."bar"`,
+		},
+		{
+			driver:     "postgres",
+			identifier: `foo.*`,
+			expected:   `"foo".*`,
+		},
+	}
+
+	for _, c := range cases {
+		if actual := quoteIdentifier(c.identifier, c.driver); actual != c.expected {
+			t.Fatalf("%q quote identifier, Expected=%v, Actual=%v", c.identifier, c.expected, actual)
 		}
 	}
 }
