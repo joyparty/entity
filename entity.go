@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
 	"github.com/pkg/errors"
 )
@@ -301,4 +302,22 @@ func Delete(ctx context.Context, ent Entity, db DB) error {
 		ent.OnEntityEvent(ctx, EventAfterDelete),
 		"after delete entity",
 	)
+}
+
+// Transaction 执行事务过程，根据结果选择提交或回滚
+func Transaction(db *sqlx.DB, fn func(tx *sqlx.Tx) error) (err error) {
+	tx, err := db.Beginx()
+	if err != nil {
+		return errors.Wrap(err, "begin database transaction")
+	}
+
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		} else {
+			err = errors.Wrap(tx.Commit(), "commit database transaction")
+		}
+	}()
+
+	return fn(tx)
 }
