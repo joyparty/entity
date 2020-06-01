@@ -27,10 +27,9 @@ type CacheOption struct {
 	Cacher     Cacher
 	Key        string
 	Expiration time.Duration
-	// PHP那边生成的缓存数据，某些字段被json encode过两次
-	// golang这边在使用这个缓存数据之前，需要先检查相应的字段是否已经被encode过
-	// 如果存在这种情况，需要先decode一次之后再给golang使用
-	AutoDecode []string
+	// 某些由其它地方构造的缓存，其中存在字段内容进入缓存前先被json encode过
+	// 这些字段缓存结果需要被decode两次才能使用
+	RecursiveDecode []string
 }
 
 func loadCache(ent Cacheable) (bool, error) {
@@ -46,8 +45,8 @@ func loadCache(ent Cacheable) (bool, error) {
 		return false, nil
 	}
 
-	if len(opt.AutoDecode) > 0 {
-		fixed, err := autoDecode(data, opt.AutoDecode)
+	if len(opt.RecursiveDecode) > 0 {
+		fixed, err := recursiveDecode(data, opt.RecursiveDecode)
 		if err != nil {
 			return false, errors.WithMessage(err, "auto decode cache")
 		}
@@ -111,7 +110,7 @@ func getCacheOption(ent Cacheable) (*CacheOption, error) {
 	return opt, nil
 }
 
-func autoDecode(data []byte, keys []string) ([]byte, error) {
+func recursiveDecode(data []byte, keys []string) ([]byte, error) {
 	if len(keys) == 0 || jsoniter.Get(data).ValueType() != jsoniter.ObjectValue {
 		return nil, nil
 	}
