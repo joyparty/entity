@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"gitlab.haochang.tv/gopkg/entity"
+	"github.com/joyparty/entity"
 )
 
 var (
