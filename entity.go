@@ -9,7 +9,6 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -91,7 +90,7 @@ func NewMetadata(ent Entity) (*Metadata, error) {
 	}
 
 	if len(md.Columns) == 0 {
-		return nil, errors.Errorf("empty entity %q", md.Type)
+		return nil, fmt.Errorf("empty entity %q", md.Type)
 	}
 
 	for _, col := range md.Columns {
@@ -107,7 +106,7 @@ func NewMetadata(ent Entity) (*Metadata, error) {
 	}
 
 	if len(md.PrimaryKeys) == 0 {
-		return nil, errors.Errorf("undefined entity %q primary key", md.Type)
+		return nil, fmt.Errorf("undefined entity %q primary key", md.Type)
 	}
 
 	return md, nil
@@ -211,19 +210,19 @@ func Load(ctx context.Context, ent Entity, db DB) error {
 	cv, cacheable := ent.(Cacheable)
 	if cacheable {
 		if loaded, err := loadCache(cv); err != nil {
-			return errors.WithMessage(err, "load entity from cache")
+			return fmt.Errorf("load from cache, %w", err)
 		} else if loaded {
 			return nil
 		}
 	}
 
 	if err := doLoad(ctx, ent, db); err != nil {
-		return errors.WithMessage(err, "load entity from db")
+		return fmt.Errorf("load from database, %w", err)
 	}
 
 	if cacheable {
 		if err := SaveCache(cv); err != nil {
-			return errors.WithMessage(err, "found entity")
+			return fmt.Errorf("save cache, %w", err)
 		}
 	}
 
@@ -236,19 +235,19 @@ func Insert(ctx context.Context, ent Entity, db DB) (int64, error) {
 	defer cancel()
 
 	if err := ent.OnEntityEvent(ctx, EventBeforeInsert); err != nil {
-		return 0, errors.WithMessage(err, "before insert entity")
+		return 0, fmt.Errorf("before insert, %w", err)
 	}
 
 	lastID, err := doInsert(ctx, ent, db)
 	if err != nil {
 		if isConflictError(db.DriverName(), err) {
-			return 0, errors.Wrap(ErrConflict, "insert entity")
+			return 0, ErrConflict
 		}
-		return 0, errors.WithMessage(err, "insert entity")
+		return 0, err
 	}
 
 	if err := ent.OnEntityEvent(ctx, EventAfterInsert); err != nil {
-		return 0, errors.WithMessage(err, "after insert entity")
+		return 0, fmt.Errorf("after insert, %w", err)
 	}
 
 	return lastID, nil
@@ -260,23 +259,23 @@ func Update(ctx context.Context, ent Entity, db DB) error {
 	defer cancel()
 
 	if err := ent.OnEntityEvent(ctx, EventBeforeUpdate); err != nil {
-		return errors.WithMessage(err, "before update entity")
+		return fmt.Errorf("before update, %w", err)
 	}
 
 	if err := doUpdate(ctx, ent, db); err != nil {
-		return errors.WithMessage(err, "update entity")
+		return err
 	}
 
 	if v, ok := ent.(Cacheable); ok {
 		if err := DeleteCache(v); err != nil {
-			return errors.WithMessage(err, "after update entity")
+			return fmt.Errorf("delete cache, %w", err)
 		}
 	}
 
-	return errors.WithMessage(
-		ent.OnEntityEvent(ctx, EventAfterUpdate),
-		"after update entity",
-	)
+	if err := ent.OnEntityEvent(ctx, EventAfterUpdate); err != nil {
+		return fmt.Errorf("after update, %w", err)
+	}
+	return nil
 }
 
 // Delete 删除entity
@@ -285,7 +284,7 @@ func Delete(ctx context.Context, ent Entity, db DB) error {
 	defer cancel()
 
 	if err := ent.OnEntityEvent(ctx, EventBeforeDelete); err != nil {
-		return err
+		return fmt.Errorf("before delete, %w", err)
 	}
 
 	if err := doDelete(ctx, ent, db); err != nil {
@@ -294,28 +293,30 @@ func Delete(ctx context.Context, ent Entity, db DB) error {
 
 	if v, ok := ent.(Cacheable); ok {
 		if err := DeleteCache(v); err != nil {
-			return errors.WithMessage(err, "after delete entity")
+			return fmt.Errorf("delete cache, %w", err)
 		}
 	}
 
-	return errors.WithMessage(
-		ent.OnEntityEvent(ctx, EventAfterDelete),
-		"after delete entity",
-	)
+	if err := ent.OnEntityEvent(ctx, EventAfterDelete); err != nil {
+		return fmt.Errorf("after delete, %w", err)
+	}
+	return nil
 }
 
 // Transaction 执行事务过程，根据结果选择提交或回滚
 func Transaction(db *sqlx.DB, fn func(tx *sqlx.Tx) error) (err error) {
 	tx, err := db.Beginx()
 	if err != nil {
-		return errors.Wrap(err, "begin database transaction")
+		return fmt.Errorf("begin transaction, %w", err)
 	}
 
 	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
+		if err == nil {
+			if txErr := tx.Commit(); txErr != nil {
+				err = fmt.Errorf("commit transaction, %w", err)
+			}
 		} else {
-			err = errors.Wrap(tx.Commit(), "commit database transaction")
+			_ = tx.Rollback()
 		}
 	}()
 

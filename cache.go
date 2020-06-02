@@ -8,7 +8,6 @@ import (
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
-	"github.com/pkg/errors"
 )
 
 // DefaultCacher 默认缓存存储
@@ -40,12 +39,12 @@ type CacheOption struct {
 func loadCache(ent Cacheable) (bool, error) {
 	opt, err := getCacheOption(ent)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("get option, %w", err)
 	}
 
 	data, err := opt.Cacher.Get(opt.Key)
 	if err != nil {
-		return false, errors.WithStack(err)
+		return false, err
 	} else if len(data) == 0 {
 		return false, nil
 	}
@@ -53,13 +52,13 @@ func loadCache(ent Cacheable) (bool, error) {
 	if opt.Compress {
 		zr, err := gzip.NewReader(bytes.NewReader(data))
 		if err != nil {
-			return false, fmt.Errorf("uncompress cache data, %w", err)
+			return false, fmt.Errorf("uncompress data, %w", err)
 		}
 		defer zr.Close()
 
 		v, err := ioutil.ReadAll(zr)
 		if err != nil {
-			return false, fmt.Errorf("uncompress cache data, %w", err)
+			return false, fmt.Errorf("uncompress data, %w", err)
 		}
 		data = v
 	}
@@ -67,18 +66,15 @@ func loadCache(ent Cacheable) (bool, error) {
 	if len(opt.RecursiveDecode) > 0 {
 		fixed, err := recursiveDecode(data, opt.RecursiveDecode)
 		if err != nil {
-			return false, errors.WithMessage(err, "auto decode cache")
-		}
-
-		if fixed != nil {
+			return false, fmt.Errorf("recursive decode, %w", err)
+		} else if fixed != nil {
 			data = fixed
 		}
 	}
 
 	if err := jsoniter.Unmarshal(data, ent); err != nil {
-		return false, errors.WithStack(err)
+		return false, fmt.Errorf("json decode, %w", err)
 	}
-
 	return true, nil
 }
 
@@ -86,37 +82,37 @@ func loadCache(ent Cacheable) (bool, error) {
 func SaveCache(ent Cacheable) error {
 	data, err := jsoniter.Marshal(ent)
 	if err != nil {
-		return errors.WithStack(err)
+		return fmt.Errorf("json encode, %w", err)
 	}
 
 	opt, err := getCacheOption(ent)
 	if err != nil {
-		return err
+		return fmt.Errorf("get option, %w", err)
 	}
 
 	if opt.Compress {
 		var zdata bytes.Buffer
 		zw := gzip.NewWriter(&zdata)
 		if _, err := zw.Write(data); err != nil {
-			return fmt.Errorf("compress cache data, %w", err)
+			return fmt.Errorf("compress cache, %w", err)
 		}
 		if err := zw.Close(); err != nil {
-			return fmt.Errorf("comporess cache data, %w", err)
+			return fmt.Errorf("comporess cache, %w", err)
 		}
 		data = zdata.Bytes()
 	}
 
-	return errors.Wrap(opt.Cacher.Put(opt.Key, data, opt.Expiration), "save entity cache")
+	return opt.Cacher.Put(opt.Key, data, opt.Expiration)
 }
 
 // DeleteCache 删除entity缓存
 func DeleteCache(ent Cacheable) error {
 	opt, err := getCacheOption(ent)
 	if err != nil {
-		return err
+		return fmt.Errorf("get option, %w", err)
 	}
 
-	return errors.Wrap(opt.Cacher.Delete(opt.Key), "delete entity cache")
+	return opt.Cacher.Delete(opt.Key)
 }
 
 func getCacheOption(ent Cacheable) (CacheOption, error) {
@@ -124,14 +120,14 @@ func getCacheOption(ent Cacheable) (CacheOption, error) {
 
 	if opt.Cacher == nil {
 		if DefaultCacher == nil {
-			return opt, errors.New("require cacher")
+			return opt, fmt.Errorf("nil default cacher")
 		}
 
 		opt.Cacher = DefaultCacher
 	}
 
 	if opt.Key == "" {
-		return opt, errors.New("empty cache key")
+		return opt, fmt.Errorf("empty cache key")
 	}
 
 	if opt.Expiration == 0 {
@@ -148,7 +144,7 @@ func recursiveDecode(data []byte, keys []string) ([]byte, error) {
 
 	vals := map[string]jsoniter.RawMessage{}
 	if err := jsoniter.Unmarshal(data, &vals); err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 
 	fixed := false
@@ -158,7 +154,7 @@ func recursiveDecode(data []byte, keys []string) ([]byte, error) {
 
 			var s string
 			if err := jsoniter.Unmarshal(vals[key], &s); err != nil {
-				return nil, errors.WithStack(err)
+				return nil, err
 			}
 
 			vals[key] = []byte(s)
@@ -171,7 +167,7 @@ func recursiveDecode(data []byte, keys []string) ([]byte, error) {
 
 	encoded, err := jsoniter.Marshal(vals)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	return encoded, nil
 }

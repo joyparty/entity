@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/pkg/errors"
 )
 
 var (
@@ -38,7 +37,7 @@ type DB interface {
 }
 
 func isConflictError(driver string, err error) bool {
-	s := errors.Cause(err).Error()
+	s := err.Error()
 	if isPostgres(driver) {
 		return strings.Contains(s, "duplicate key value violates unique constraint")
 	} else if driver == "mysql" {
@@ -56,7 +55,7 @@ func isPostgres(driver string) bool {
 func doLoad(ctx context.Context, ent Entity, db DB) error {
 	md, err := getMetadata(ent)
 	if err != nil {
-		return err
+		return fmt.Errorf("get metadata, %w", err)
 	}
 
 	stmt, ok := selectStatements[md.Type]
@@ -67,25 +66,25 @@ func doLoad(ctx context.Context, ent Entity, db DB) error {
 
 	rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 	defer rows.Close()
 
 	if !rows.Next() {
-		return errors.WithStack(sql.ErrNoRows)
+		return sql.ErrNoRows
 	}
 
 	if err := rows.StructScan(ent); err != nil {
-		return errors.WithStack(err)
+		return fmt.Errorf("scan struct, %w", err)
 	}
 
-	return errors.WithStack(rows.Err())
+	return rows.Err()
 }
 
 func doInsert(ctx context.Context, ent Entity, db DB) (int64, error) {
 	md, err := getMetadata(ent)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("get metadata, %w", err)
 	}
 
 	stmt, ok := insertStatements[md.Type]
@@ -97,24 +96,24 @@ func doInsert(ctx context.Context, ent Entity, db DB) (int64, error) {
 	if md.hasReturningInsert {
 		rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
 		if err != nil {
-			return 0, errors.WithStack(err)
+			return 0, err
 		}
 		defer rows.Close()
 
 		if !rows.Next() {
-			return 0, errors.WithStack(sql.ErrNoRows)
+			return 0, sql.ErrNoRows
 		}
 
 		if err := rows.StructScan(ent); err != nil {
-			return 0, errors.WithStack(err)
+			return 0, fmt.Errorf("scan struct, %w", err)
 		}
 
-		return 0, errors.WithStack(rows.Err())
+		return 0, rows.Err()
 	}
 
 	result, err := db.NamedExecContext(ctx, stmt, ent)
 	if err != nil {
-		return 0, errors.WithStack(err)
+		return 0, err
 	}
 
 	// postgresql不支持LastInsertId特性
@@ -123,13 +122,13 @@ func doInsert(ctx context.Context, ent Entity, db DB) (int64, error) {
 	}
 
 	lastID, err := result.LastInsertId()
-	return lastID, errors.WithStack(err)
+	return lastID, fmt.Errorf("get last insert id, %w", err)
 }
 
 func doUpdate(ctx context.Context, ent Entity, db DB) error {
 	md, err := getMetadata(ent)
 	if err != nil {
-		return err
+		return fmt.Errorf("get metadata, %w", err)
 	}
 
 	stmt, ok := updateStatements[md.Type]
@@ -141,30 +140,30 @@ func doUpdate(ctx context.Context, ent Entity, db DB) error {
 	if md.hasReturningUpdate {
 		rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
 		if err != nil {
-			return errors.WithStack(err)
+			return err
 		}
 		defer rows.Close()
 
 		if !rows.Next() {
-			return errors.WithStack(sql.ErrNoRows)
+			return sql.ErrNoRows
 		}
 
 		if err := rows.StructScan(ent); err != nil {
-			return errors.WithStack(err)
+			return fmt.Errorf("scan struct, %w", err)
 		}
 
-		return errors.WithStack(rows.Err())
+		return rows.Err()
 	}
 
 	result, err := db.NamedExecContext(ctx, stmt, ent)
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 
 	if n, err := result.RowsAffected(); err != nil {
-		return errors.WithStack(err)
+		return fmt.Errorf("get affected rows, %w", err)
 	} else if n == 0 {
-		return errors.WithStack(sql.ErrNoRows)
+		return sql.ErrNoRows
 	}
 
 	return nil
@@ -174,7 +173,7 @@ func doUpdate(ctx context.Context, ent Entity, db DB) error {
 func doDelete(ctx context.Context, ent Entity, db DB) error {
 	md, err := getMetadata(ent)
 	if err != nil {
-		return errors.WithMessage(err, "delete entity")
+		return fmt.Errorf("get metadata, %w", err)
 	}
 
 	stmt, ok := deleteStatements[md.Type]
@@ -184,7 +183,7 @@ func doDelete(ctx context.Context, ent Entity, db DB) error {
 	}
 
 	_, err = db.NamedExecContext(ctx, stmt, ent)
-	return errors.Wrapf(err, "delete entity %s", md.Type)
+	return err
 }
 
 func selectStatement(ent Entity, md *Metadata, driver string) string {
