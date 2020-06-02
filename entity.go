@@ -217,7 +217,7 @@ func Load(ctx context.Context, ent Entity, db DB) error {
 	}
 
 	if err := doLoad(ctx, ent, db); err != nil {
-		return fmt.Errorf("load from database, %w", err)
+		return err
 	}
 
 	if cacheable {
