@@ -16,7 +16,7 @@ var DefaultCacher Cacher
 
 // Cacheable 可缓存实体对象接口
 type Cacheable interface {
-	CacheOption() *CacheOption
+	CacheOption() CacheOption
 }
 
 // Cacher 缓存数据存储接口
@@ -119,19 +119,19 @@ func DeleteCache(ent Cacheable) error {
 	return errors.Wrap(opt.Cacher.Delete(opt.Key), "delete entity cache")
 }
 
-func getCacheOption(ent Cacheable) (*CacheOption, error) {
+func getCacheOption(ent Cacheable) (CacheOption, error) {
 	opt := ent.CacheOption()
 
 	if opt.Cacher == nil {
 		if DefaultCacher == nil {
-			return nil, errors.New("require cacher")
+			return opt, errors.New("require cacher")
 		}
 
 		opt.Cacher = DefaultCacher
 	}
 
 	if opt.Key == "" {
-		return nil, errors.New("empty cache key")
+		return opt, errors.New("empty cache key")
 	}
 
 	if opt.Expiration == 0 {

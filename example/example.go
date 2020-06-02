@@ -55,8 +55,8 @@ func (u *User) OnEntityEvent(ctx context.Context, ev entity.Event) error {
 }
 
 // CacheOption 缓存配置，不实现这个方法就不会自动缓存，entity.Cacheable接口方法
-func (u *User) CacheOption() *entity.CacheOption {
-	return &entity.CacheOption{
+func (u *User) CacheOption() entity.CacheOption {
+	return entity.CacheOption{
 		Key:        fmt.Sprintf(`user:entity:%d`, u.ID),
 		Expiration: 10 * time.Minute,
 		Cacher:     &fakeCacher{},
