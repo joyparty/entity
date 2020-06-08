@@ -217,7 +217,7 @@ func Load(ctx context.Context, ent Entity, db DB) error {
 	}
 
 	if err := doLoad(ctx, ent, db); err != nil {
-		return fmt.Errorf("load from database, %w", err)
+		return err
 	}
 
 	if cacheable {
@@ -313,7 +313,7 @@ func Transaction(db *sqlx.DB, fn func(tx *sqlx.Tx) error) (err error) {
 	defer func() {
 		if err == nil {
 			if txErr := tx.Commit(); txErr != nil {
-				err = fmt.Errorf("commit transaction, %w", err)
+				err = fmt.Errorf("commit transaction, %w", txErr)
 			}
 		} else {
 			_ = tx.Rollback()
