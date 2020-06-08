@@ -240,7 +240,7 @@ func Insert(ctx context.Context, ent Entity, db DB) (int64, error) {
 
 	lastID, err := doInsert(ctx, ent, db)
 	if err != nil {
-		if isConflictError(db.DriverName(), err) {
+		if isConflictError(db, err) {
 			return 0, ErrConflict
 		}
 		return 0, err

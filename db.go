@@ -15,6 +15,14 @@ var (
 	insertStatements = map[reflect.Type]string{}
 	updateStatements = map[reflect.Type]string{}
 	deleteStatements = map[reflect.Type]string{}
+
+	driverMysql    = "mysql"
+	driverPostgres = "postgres"
+	driverSqlite3  = "sqlite3"
+
+	driverAlias = map[string]string{
+		"pgx": driverPostgres,
+	}
 )
 
 // DB 数据库接口
@@ -36,20 +44,26 @@ type DB interface {
 	BindNamed(string, interface{}) (string, []interface{}, error)
 }
 
-func isConflictError(driver string, err error) bool {
+func dbDriver(db DB) string {
+	dv := db.DriverName()
+	if v, ok := driverAlias[dv]; ok {
+		return v
+	}
+	return dv
+}
+
+func isConflictError(db DB, err error) bool {
+	driver := dbDriver(db)
+
 	s := err.Error()
-	if isPostgres(driver) {
+	if driver == driverPostgres {
 		return strings.Contains(s, "duplicate key value violates unique constraint")
-	} else if driver == "mysql" {
+	} else if driver == driverMysql {
 		return strings.Contains(s, "Duplicate entry")
-	} else if driver == "sqlite3" {
+	} else if driver == driverSqlite3 {
 		return strings.Contains(s, "UNIQUE constraint failed")
 	}
 	return false
-}
-
-func isPostgres(driver string) bool {
-	return driver == "pgx" || driver == "postgres"
 }
 
 func doLoad(ctx context.Context, ent Entity, db DB) error {
@@ -60,7 +74,7 @@ func doLoad(ctx context.Context, ent Entity, db DB) error {
 
 	stmt, ok := selectStatements[md.Type]
 	if !ok {
-		stmt = selectStatement(ent, md, db.DriverName())
+		stmt = selectStatement(ent, md, dbDriver(db))
 		selectStatements[md.Type] = stmt
 	}
 
@@ -89,7 +103,7 @@ func doInsert(ctx context.Context, ent Entity, db DB) (int64, error) {
 
 	stmt, ok := insertStatements[md.Type]
 	if !ok {
-		stmt = insertStatement(ent, md, db.DriverName())
+		stmt = insertStatement(ent, md, dbDriver(db))
 		insertStatements[md.Type] = stmt
 	}
 
@@ -117,7 +131,7 @@ func doInsert(ctx context.Context, ent Entity, db DB) (int64, error) {
 	}
 
 	// postgresql不支持LastInsertId特性
-	if isPostgres(db.DriverName()) {
+	if dbDriver(db) == driverPostgres {
 		return 0, nil
 	}
 
@@ -133,7 +147,7 @@ func doUpdate(ctx context.Context, ent Entity, db DB) error {
 
 	stmt, ok := updateStatements[md.Type]
 	if !ok {
-		stmt = updateStatement(ent, md, db.DriverName())
+		stmt = updateStatement(ent, md, dbDriver(db))
 		updateStatements[md.Type] = stmt
 	}
 
@@ -178,7 +192,7 @@ func doDelete(ctx context.Context, ent Entity, db DB) error {
 
 	stmt, ok := deleteStatements[md.Type]
 	if !ok {
-		stmt = deleteStatement(ent, md, db.DriverName())
+		stmt = deleteStatement(ent, md, dbDriver(db))
 		deleteStatements[md.Type] = stmt
 	}
 
@@ -281,16 +295,15 @@ func deleteStatement(ent Entity, md *Metadata, driver string) string {
 }
 
 func quoteColumn(name string, driver string) string {
-	if driver == "mysql" {
+	if driver == driverMysql {
 		return fmt.Sprintf("`%s`", name)
 	}
-
 	return fmt.Sprintf("%q", name)
 }
 
 func quoteIdentifier(name string, driver string) string {
 	symbol := `"`
-	if driver == "mysql" {
+	if driver == driverMysql {
 		symbol = "`"
 	}
 

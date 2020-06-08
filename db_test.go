@@ -9,13 +9,13 @@ func TestStatement(t *testing.T) {
 	t.Run("select", func(t *testing.T) {
 		md, _ := newTestMetadata(&GenernalEntity{})
 
-		stmt := selectStatement(&GenernalEntity{}, md, "mysql")
+		stmt := selectStatement(&GenernalEntity{}, md, driverMysql)
 		expected := "SELECT `create_at`, `extra`, `id`, `id2`, `name`, `version` FROM `genernal` WHERE `id` = :id AND `id2` = :id2 LIMIT 1"
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
 
-		stmt = selectStatement(&GenernalEntity{}, md, "postgres")
+		stmt = selectStatement(&GenernalEntity{}, md, driverPostgres)
 		expected = `SELECT "create_at", "extra", "id", "id2", "name", "version" FROM "genernal" WHERE "id" = :id AND "id2" = :id2 LIMIT 1`
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
@@ -25,13 +25,13 @@ func TestStatement(t *testing.T) {
 	t.Run("insert", func(t *testing.T) {
 		md, _ := newTestMetadata(&GenernalEntity{})
 
-		stmt := insertStatement(&GenernalEntity{}, md, "mysql")
+		stmt := insertStatement(&GenernalEntity{}, md, driverMysql)
 		expected := "INSERT INTO `genernal` (`extra`, `id2`, `name`) VALUES (:extra, :id2, :name) RETURNING `create_at`, `version`"
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
 
-		stmt = insertStatement(&GenernalEntity{}, md, "postgres")
+		stmt = insertStatement(&GenernalEntity{}, md, driverPostgres)
 		expected = `INSERT INTO "genernal" ("extra", "id2", "name") VALUES (:extra, :id2, :name) RETURNING "create_at", "version"`
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
@@ -41,13 +41,13 @@ func TestStatement(t *testing.T) {
 	t.Run("update", func(t *testing.T) {
 		md, _ := newTestMetadata(&GenernalEntity{})
 
-		stmt := updateStatement(&GenernalEntity{}, md, "mysql")
+		stmt := updateStatement(&GenernalEntity{}, md, driverMysql)
 		expected := "UPDATE `genernal` SET `extra` = :extra, `name` = :name WHERE `id` = :id AND `id2` = :id2 RETURNING `version`"
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
 
-		stmt = updateStatement(&GenernalEntity{}, md, "postgres")
+		stmt = updateStatement(&GenernalEntity{}, md, driverPostgres)
 		expected = `UPDATE "genernal" SET "extra" = :extra, "name" = :name WHERE "id" = :id AND "id2" = :id2 RETURNING "version"`
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
@@ -57,13 +57,13 @@ func TestStatement(t *testing.T) {
 	t.Run("delete", func(t *testing.T) {
 		md, _ := newTestMetadata(&GenernalEntity{})
 
-		stmt := deleteStatement(&GenernalEntity{}, md, "mysql")
+		stmt := deleteStatement(&GenernalEntity{}, md, driverMysql)
 		expected := "DELETE FROM `genernal` WHERE `id` = :id AND `id2` = :id2"
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
 
-		stmt = deleteStatement(&GenernalEntity{}, md, "postgres")
+		stmt = deleteStatement(&GenernalEntity{}, md, driverPostgres)
 		expected = `DELETE FROM "genernal" WHERE "id" = :id AND "id2" = :id2`
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
@@ -78,12 +78,12 @@ func TestQuoteColumn(t *testing.T) {
 		expected string
 	}{
 		{
-			driver:   "mysql",
+			driver:   driverMysql,
 			column:   "id",
 			expected: "`id`",
 		},
 		{
-			driver:   "postgres",
+			driver:   driverPostgres,
 			column:   "id",
 			expected: `"id"`,
 		},
@@ -103,27 +103,27 @@ func TestQuoteIdentifier(t *testing.T) {
 		expected   string
 	}{
 		{
-			driver:     "mysql",
+			driver:     driverMysql,
 			identifier: "foobar",
 			expected:   "`foobar`",
 		},
 		{
-			driver:     "postgres",
+			driver:     driverPostgres,
 			identifier: "foobar",
 			expected:   `"foobar"`,
 		},
 		{
-			driver:     "postgres",
+			driver:     driverPostgres,
 			identifier: "foo.bar",
 			expected:   `"foo"."bar"`,
 		},
 		{
-			driver:     "postgres",
+			driver:     driverPostgres,
 			identifier: `"foo".bar`,
 			expected:   `"foo"."bar"`,
 		},
 		{
-			driver:     "postgres",
+			driver:     driverPostgres,
 			identifier: `foo.*`,
 			expected:   `"foo".*`,
 		},
