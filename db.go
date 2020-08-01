@@ -66,7 +66,7 @@ func isConflictError(db DB, err error) bool {
 	return false
 }
 
-func doLoad(ctx context.Context, ent Entity, db DB) error {
+func doLoad(ctx context.Context, db DB, ent Entity) error {
 	md, err := getMetadata(ent)
 	if err != nil {
 		return fmt.Errorf("get metadata, %w", err)
@@ -95,7 +95,7 @@ func doLoad(ctx context.Context, ent Entity, db DB) error {
 	return rows.Err()
 }
 
-func doInsert(ctx context.Context, ent Entity, db DB) (int64, error) {
+func doInsert(ctx context.Context, db DB, ent Entity) (int64, error) {
 	md, err := getMetadata(ent)
 	if err != nil {
 		return 0, fmt.Errorf("get metadata, %w", err)
@@ -139,7 +139,7 @@ func doInsert(ctx context.Context, ent Entity, db DB) (int64, error) {
 	return lastID, fmt.Errorf("get last insert id, %w", err)
 }
 
-func doUpdate(ctx context.Context, ent Entity, db DB) error {
+func doUpdate(ctx context.Context, db DB, ent Entity) error {
 	md, err := getMetadata(ent)
 	if err != nil {
 		return fmt.Errorf("get metadata, %w", err)
@@ -181,10 +181,9 @@ func doUpdate(ctx context.Context, ent Entity, db DB) error {
 	}
 
 	return nil
-
 }
 
-func doDelete(ctx context.Context, ent Entity, db DB) error {
+func doDelete(ctx context.Context, db DB, ent Entity) error {
 	md, err := getMetadata(ent)
 	if err != nil {
 		return fmt.Errorf("get metadata, %w", err)

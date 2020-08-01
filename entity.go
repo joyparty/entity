@@ -203,7 +203,7 @@ func getFields(node *reflectx.FieldInfo) []*reflectx.FieldInfo {
 }
 
 // Load 从数据库载入entity
-func Load(ctx context.Context, ent Entity, db DB) error {
+func Load(ctx context.Context, db DB, ent Entity) error {
 	ctx, cancel := context.WithTimeout(ctx, ReadTimeout)
 	defer cancel()
 
@@ -216,7 +216,7 @@ func Load(ctx context.Context, ent Entity, db DB) error {
 		}
 	}
 
-	if err := doLoad(ctx, ent, db); err != nil {
+	if err := doLoad(ctx, db, ent); err != nil {
 		return err
 	}
 
@@ -230,7 +230,7 @@ func Load(ctx context.Context, ent Entity, db DB) error {
 }
 
 // Insert 插入新entity
-func Insert(ctx context.Context, ent Entity, db DB) (int64, error) {
+func Insert(ctx context.Context, db DB, ent Entity) (int64, error) {
 	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
 	defer cancel()
 
@@ -238,7 +238,7 @@ func Insert(ctx context.Context, ent Entity, db DB) (int64, error) {
 		return 0, fmt.Errorf("before insert, %w", err)
 	}
 
-	lastID, err := doInsert(ctx, ent, db)
+	lastID, err := doInsert(ctx, db, ent)
 	if err != nil {
 		if isConflictError(db, err) {
 			return 0, ErrConflict
@@ -254,7 +254,7 @@ func Insert(ctx context.Context, ent Entity, db DB) (int64, error) {
 }
 
 // Update 更新entity
-func Update(ctx context.Context, ent Entity, db DB) error {
+func Update(ctx context.Context, db DB, ent Entity) error {
 	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
 	defer cancel()
 
@@ -262,7 +262,7 @@ func Update(ctx context.Context, ent Entity, db DB) error {
 		return fmt.Errorf("before update, %w", err)
 	}
 
-	if err := doUpdate(ctx, ent, db); err != nil {
+	if err := doUpdate(ctx, db, ent); err != nil {
 		return err
 	}
 
@@ -279,7 +279,7 @@ func Update(ctx context.Context, ent Entity, db DB) error {
 }
 
 // Delete 删除entity
-func Delete(ctx context.Context, ent Entity, db DB) error {
+func Delete(ctx context.Context, db DB, ent Entity) error {
 	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
 	defer cancel()
 
@@ -287,7 +287,7 @@ func Delete(ctx context.Context, ent Entity, db DB) error {
 		return fmt.Errorf("before delete, %w", err)
 	}
 
-	if err := doDelete(ctx, ent, db); err != nil {
+	if err := doDelete(ctx, db, ent); err != nil {
 		return err
 	}
 
