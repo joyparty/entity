@@ -10,6 +10,13 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+const (
+	cmdSelect = "select"
+	cmdInsert = "insert"
+	cmdUpdate = "update"
+	cmdDelete = "delete"
+)
+
 var (
 	selectStatements = map[reflect.Type]string{}
 	insertStatements = map[reflect.Type]string{}
@@ -72,12 +79,7 @@ func doLoad(ctx context.Context, db DB, ent Entity) error {
 		return fmt.Errorf("get metadata, %w", err)
 	}
 
-	stmt, ok := selectStatements[md.Type]
-	if !ok {
-		stmt = selectStatement(ent, md, dbDriver(db))
-		selectStatements[md.Type] = stmt
-	}
-
+	stmt := getStatement(cmdSelect, md, dbDriver(db))
 	rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
 	if err != nil {
 		return err
@@ -101,12 +103,7 @@ func doInsert(ctx context.Context, db DB, ent Entity) (int64, error) {
 		return 0, fmt.Errorf("get metadata, %w", err)
 	}
 
-	stmt, ok := insertStatements[md.Type]
-	if !ok {
-		stmt = insertStatement(ent, md, dbDriver(db))
-		insertStatements[md.Type] = stmt
-	}
-
+	stmt := getStatement(cmdInsert, md, dbDriver(db))
 	if md.hasReturningInsert {
 		rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
 		if err != nil {
@@ -145,12 +142,7 @@ func doUpdate(ctx context.Context, db DB, ent Entity) error {
 		return fmt.Errorf("get metadata, %w", err)
 	}
 
-	stmt, ok := updateStatements[md.Type]
-	if !ok {
-		stmt = updateStatement(ent, md, dbDriver(db))
-		updateStatements[md.Type] = stmt
-	}
-
+	stmt := getStatement(cmdUpdate, md, dbDriver(db))
 	if md.hasReturningUpdate {
 		rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
 		if err != nil {
@@ -189,17 +181,44 @@ func doDelete(ctx context.Context, db DB, ent Entity) error {
 		return fmt.Errorf("get metadata, %w", err)
 	}
 
-	stmt, ok := deleteStatements[md.Type]
-	if !ok {
-		stmt = deleteStatement(ent, md, dbDriver(db))
-		deleteStatements[md.Type] = stmt
-	}
-
+	stmt := getStatement(cmdDelete, md, dbDriver(db))
 	_, err = db.NamedExecContext(ctx, stmt, ent)
 	return err
 }
 
-func selectStatement(ent Entity, md *Metadata, driver string) string {
+func getStatement(cmd string, md *Metadata, driver string) string {
+	var (
+		m  map[reflect.Type]string
+		fn func(*Metadata, string) string
+	)
+
+	switch cmd {
+	case cmdSelect:
+		m = selectStatements
+		fn = newSelectStatement
+	case cmdInsert:
+		m = insertStatements
+		fn = newInsertStatement
+	case cmdUpdate:
+		m = updateStatements
+		fn = newUpdateStatement
+	case cmdDelete:
+		m = deleteStatements
+		fn = newDeleteStatement
+	default:
+		panic(fmt.Errorf("unimplemented command %q", cmd))
+	}
+
+	if stmt, ok := m[md.Type]; ok {
+		return stmt
+	}
+
+	stmt := fn(md, driver)
+	m[md.Type] = stmt
+	return stmt
+}
+
+func newSelectStatement(md *Metadata, driver string) string {
 	columns := []string{}
 	for _, col := range md.Columns {
 		columns = append(columns, quoteColumn(col.DBField, driver))
@@ -218,7 +237,7 @@ func selectStatement(ent Entity, md *Metadata, driver string) string {
 	return stmt
 }
 
-func insertStatement(ent Entity, md *Metadata, driver string) string {
+func newInsertStatement(md *Metadata, driver string) string {
 	columns := []string{}
 	returnings := []string{}
 	placeholder := []string{}
@@ -247,7 +266,7 @@ func insertStatement(ent Entity, md *Metadata, driver string) string {
 	return stmt
 }
 
-func updateStatement(ent Entity, md *Metadata, driver string) string {
+func newUpdateStatement(md *Metadata, driver string) string {
 	returnings := []string{}
 	stmt := fmt.Sprintf("UPDATE %s SET", quoteIdentifier(md.TableName, driver))
 
@@ -280,7 +299,7 @@ func updateStatement(ent Entity, md *Metadata, driver string) string {
 	return stmt
 }
 
-func deleteStatement(ent Entity, md *Metadata, driver string) string {
+func newDeleteStatement(md *Metadata, driver string) string {
 	stmt := fmt.Sprintf("DELETE FROM %s WHERE", quoteIdentifier(md.TableName, driver))
 	for i, col := range md.PrimaryKeys {
 		if i == 0 {
