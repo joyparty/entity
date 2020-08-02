@@ -310,7 +310,7 @@ func PrepareInsert(ctx context.Context, db DB, ent Entity) (*PrepareInsertStatem
 		return nil, fmt.Errorf("get metadata, %w", err)
 	}
 
-	query := getStatement(CommandInsert, md, dbDriver(db))
+	query := getStatement(commandInsert, md, dbDriver(db))
 	stmt, err := db.PrepareNamedContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -330,7 +330,7 @@ func PrepareUpdate(ctx context.Context, db DB, ent Entity) (*PrepareUpdateStatem
 		return nil, fmt.Errorf("get metadata, %w", err)
 	}
 
-	query := getStatement(CommandUpdate, md, dbDriver(db))
+	query := getStatement(commandUpdate, md, dbDriver(db))
 	stmt, err := db.PrepareNamedContext(ctx, query)
 	if err != nil {
 		return nil, err

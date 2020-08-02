@@ -11,14 +11,14 @@ import (
 )
 
 const (
-	// CommandSelect is sql select from command
-	CommandSelect Command = "select"
-	// CommandInsert is sql insert into command
-	CommandInsert Command = "insert"
-	// CommandUpdate is sql update command
-	CommandUpdate Command = "update"
-	// CommandDelete is sql delete from command
-	CommandDelete Command = "delete"
+	commandSelect = "select"
+	commandInsert = "insert"
+	commandUpdate = "update"
+	commandDelete = "delete"
+
+	driverMysql    = "mysql"
+	driverPostgres = "postgres"
+	driverSqlite3  = "sqlite3"
 )
 
 var (
@@ -26,10 +26,6 @@ var (
 	insertStatements = map[reflect.Type]string{}
 	updateStatements = map[reflect.Type]string{}
 	deleteStatements = map[reflect.Type]string{}
-
-	driverMysql    = "mysql"
-	driverPostgres = "postgres"
-	driverSqlite3  = "sqlite3"
 
 	driverAlias = map[string]string{
 		"pgx": driverPostgres,
@@ -39,9 +35,6 @@ var (
 	_ DB = (*sqlx.DB)(nil)
 	_ DB = (*sqlx.Tx)(nil)
 )
-
-// Command is kind of CRUD command
-type Command string
 
 // DB 数据库接口
 // sqlx.DB 和 sqlx.Tx 公共方法
@@ -94,7 +87,7 @@ func doLoad(ctx context.Context, db DB, ent Entity) error {
 		return fmt.Errorf("get metadata, %w", err)
 	}
 
-	stmt := getStatement(CommandSelect, md, dbDriver(db))
+	stmt := getStatement(commandSelect, md, dbDriver(db))
 	rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
 	if err != nil {
 		return err
@@ -118,7 +111,7 @@ func doInsert(ctx context.Context, db DB, ent Entity) (int64, error) {
 		return 0, fmt.Errorf("get metadata, %w", err)
 	}
 
-	stmt := getStatement(CommandInsert, md, dbDriver(db))
+	stmt := getStatement(commandInsert, md, dbDriver(db))
 	if md.hasReturningInsert {
 		rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
 		if err != nil {
@@ -160,7 +153,7 @@ func doUpdate(ctx context.Context, db DB, ent Entity) error {
 		return fmt.Errorf("get metadata, %w", err)
 	}
 
-	stmt := getStatement(CommandUpdate, md, dbDriver(db))
+	stmt := getStatement(commandUpdate, md, dbDriver(db))
 	if md.hasReturningUpdate {
 		rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
 		if err != nil {
@@ -199,28 +192,28 @@ func doDelete(ctx context.Context, db DB, ent Entity) error {
 		return fmt.Errorf("get metadata, %w", err)
 	}
 
-	stmt := getStatement(CommandDelete, md, dbDriver(db))
+	stmt := getStatement(commandDelete, md, dbDriver(db))
 	_, err = db.NamedExecContext(ctx, stmt, ent)
 	return err
 }
 
-func getStatement(cmd Command, md *Metadata, driver string) string {
+func getStatement(cmd string, md *Metadata, driver string) string {
 	var (
 		m  map[reflect.Type]string
 		fn func(*Metadata, string) string
 	)
 
 	switch cmd {
-	case CommandSelect:
+	case commandSelect:
 		m = selectStatements
 		fn = newSelectStatement
-	case CommandInsert:
+	case commandInsert:
 		m = insertStatements
 		fn = newInsertStatement
-	case CommandUpdate:
+	case commandUpdate:
 		m = updateStatements
 		fn = newUpdateStatement
-	case CommandDelete:
+	case commandDelete:
 		m = deleteStatements
 		fn = newDeleteStatement
 	default:
