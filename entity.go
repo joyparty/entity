@@ -2,6 +2,7 @@ package entity
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"reflect"
 	"sync"
@@ -303,6 +304,33 @@ func Delete(ctx context.Context, ent Entity, db DB) error {
 	return nil
 }
 
+// Transaction 执行事务过程，根据结果选择提交或回滚
+func Transaction(db *sqlx.DB, fn func(tx *sqlx.Tx) error) (err error) {
+	tx, err := db.Beginx()
+	if err != nil {
+		return fmt.Errorf("begin transaction, %w", err)
+	}
+
+	defer func() {
+		if err == nil {
+			if txErr := tx.Commit(); txErr != nil {
+				err = fmt.Errorf("commit transaction, %w", txErr)
+			}
+		} else {
+			_ = tx.Rollback()
+		}
+	}()
+
+	return fn(tx)
+}
+
+// PrepareInsertStatement is a prepared insert statement for entity
+type PrepareInsertStatement struct {
+	md       *Metadata
+	stmt     *sqlx.NamedStmt
+	dbDriver string
+}
+
 // PrepareInsert returns a prepared insert statement for Entity
 func PrepareInsert(ctx context.Context, ent Entity, db DB) (*PrepareInsertStatement, error) {
 	md, err := getMetadata(ent)
@@ -321,6 +349,63 @@ func PrepareInsert(ctx context.Context, ent Entity, db DB) (*PrepareInsertStatem
 		stmt:     stmt,
 		dbDriver: dbDriver(db),
 	}, nil
+}
+
+// Close closes the prepared statement
+func (pis *PrepareInsertStatement) Close() error {
+	return pis.stmt.Close()
+}
+
+// ExecContext executes a prepared insert statement using the Entity passed.
+func (pis *PrepareInsertStatement) ExecContext(ctx context.Context, ent Entity) (lastID int64, err error) {
+	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
+	defer cancel()
+
+	if err := ent.OnEntityEvent(ctx, EventBeforeInsert); err != nil {
+		return 0, fmt.Errorf("before insert, %w", err)
+	}
+
+	lastID, err = pis.execContext(ctx, ent)
+	if err != nil {
+		if isConflictError(err, pis.dbDriver) {
+			return 0, ErrConflict
+		}
+		return 0, err
+	}
+
+	if err := ent.OnEntityEvent(ctx, EventAfterInsert); err != nil {
+		return 0, fmt.Errorf("after insert, %w", err)
+	}
+
+	return lastID, nil
+}
+
+func (pis *PrepareInsertStatement) execContext(ctx context.Context, ent Entity) (lastID int64, err error) {
+	if pis.md.hasReturningInsert {
+		err := pis.stmt.QueryRowxContext(ctx, ent).StructScan(ent)
+		return 0, err
+	}
+
+	result, err := pis.stmt.ExecContext(ctx, ent)
+	if err != nil {
+		return 0, err
+	} else if pis.dbDriver == driverPostgres {
+		// postgresql不支持LastInsertId特性
+		return 0, nil
+	}
+
+	lastID, err = result.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("get last insert id, %w", err)
+	}
+	return lastID, nil
+}
+
+// PrepareUpdateStatement is a prepared update statement for entity
+type PrepareUpdateStatement struct {
+	md       *Metadata
+	stmt     *sqlx.NamedStmt
+	dbDriver string
 }
 
 // PrepareUpdate returns a prepared update statement for Entity
@@ -343,22 +428,50 @@ func PrepareUpdate(ctx context.Context, ent Entity, db DB) (*PrepareUpdateStatem
 	}, nil
 }
 
-// Transaction 执行事务过程，根据结果选择提交或回滚
-func Transaction(db *sqlx.DB, fn func(tx *sqlx.Tx) error) (err error) {
-	tx, err := db.Beginx()
-	if err != nil {
-		return fmt.Errorf("begin transaction, %w", err)
+// Close closes the prepared statement
+func (pus *PrepareUpdateStatement) Close() error {
+	return pus.stmt.Close()
+}
+
+// ExecContext executes a prepared update statement using the Entity passed.
+func (pus *PrepareUpdateStatement) ExecContext(ctx context.Context, ent Entity) error {
+	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
+	defer cancel()
+
+	if err := ent.OnEntityEvent(ctx, EventBeforeUpdate); err != nil {
+		return fmt.Errorf("before update, %w", err)
 	}
 
-	defer func() {
-		if err == nil {
-			if txErr := tx.Commit(); txErr != nil {
-				err = fmt.Errorf("commit transaction, %w", txErr)
-			}
-		} else {
-			_ = tx.Rollback()
-		}
-	}()
+	if err := pus.execContext(ctx, ent); err != nil {
+		return err
+	}
 
-	return fn(tx)
+	if v, ok := ent.(Cacheable); ok {
+		if err := DeleteCache(v); err != nil {
+			return fmt.Errorf("delete cache, %w", err)
+		}
+	}
+
+	if err := ent.OnEntityEvent(ctx, EventAfterUpdate); err != nil {
+		return fmt.Errorf("after update, %w", err)
+	}
+	return nil
+}
+
+func (pus *PrepareUpdateStatement) execContext(ctx context.Context, ent Entity) error {
+	if pus.md.hasReturningUpdate {
+		return pus.stmt.QueryRowxContext(ctx, ent).StructScan(ent)
+	}
+
+	result, err := pus.stmt.ExecContext(ctx, ent)
+	if err != nil {
+		return err
+	}
+
+	if n, err := result.RowsAffected(); err != nil {
+		return fmt.Errorf("get affected rows, %w", err)
+	} else if n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
