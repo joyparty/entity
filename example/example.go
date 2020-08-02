@@ -66,7 +66,7 @@ func (u *User) CacheOption() entity.CacheOption {
 // FindUser 根据ID查询用户
 func FindUser(ctx context.Context, id int64) (*User, error) {
 	u := &User{ID: id}
-	if err := entity.Load(ctx, defaultDB, u); err != nil {
+	if err := entity.Load(ctx, u, defaultDB); err != nil {
 		return nil, err
 	}
 	return u, nil
@@ -83,7 +83,7 @@ func InsertUserTx(ctx context.Context, u *User, tx *sqlx.Tx) error {
 }
 
 func insertUser(ctx context.Context, u *User, db entity.DB) error {
-	id, err := entity.Insert(ctx, db, u)
+	id, err := entity.Insert(ctx, u, db)
 	if err != nil {
 		return err
 	}
@@ -94,22 +94,22 @@ func insertUser(ctx context.Context, u *User, db entity.DB) error {
 
 // UpdateUser 更新用户数据
 func UpdateUser(ctx context.Context, u *User) error {
-	return entity.Update(ctx, defaultDB, u)
+	return entity.Update(ctx, u, defaultDB)
 }
 
 // UpdateUserTx 使用事务更新用户数据
 func UpdateUserTx(ctx context.Context, u *User, tx *sqlx.Tx) error {
-	return entity.Update(ctx, tx, u)
+	return entity.Update(ctx, u, tx)
 }
 
 // DeleteUser 删除用户
 func DeleteUser(ctx context.Context, u *User) error {
-	return entity.Delete(ctx, defaultDB, u)
+	return entity.Delete(ctx, u, defaultDB)
 }
 
 // DeleteUserTx 使用事务删除用户
 func DeleteUserTx(ctx context.Context, u *User, tx *sqlx.Tx) error {
-	return entity.Delete(ctx, tx, u)
+	return entity.Delete(ctx, u, tx)
 }
 
 type fakeCacher struct{}

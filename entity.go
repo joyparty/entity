@@ -203,7 +203,7 @@ func getFields(node *reflectx.FieldInfo) []*reflectx.FieldInfo {
 }
 
 // Load 从数据库载入entity
-func Load(ctx context.Context, db DB, ent Entity) error {
+func Load(ctx context.Context, ent Entity, db DB) error {
 	ctx, cancel := context.WithTimeout(ctx, ReadTimeout)
 	defer cancel()
 
@@ -216,7 +216,7 @@ func Load(ctx context.Context, db DB, ent Entity) error {
 		}
 	}
 
-	if err := doLoad(ctx, db, ent); err != nil {
+	if err := doLoad(ctx, ent, db); err != nil {
 		return err
 	}
 
@@ -230,7 +230,7 @@ func Load(ctx context.Context, db DB, ent Entity) error {
 }
 
 // Insert 插入新entity
-func Insert(ctx context.Context, db DB, ent Entity) (int64, error) {
+func Insert(ctx context.Context, ent Entity, db DB) (int64, error) {
 	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
 	defer cancel()
 
@@ -238,7 +238,7 @@ func Insert(ctx context.Context, db DB, ent Entity) (int64, error) {
 		return 0, fmt.Errorf("before insert, %w", err)
 	}
 
-	lastID, err := doInsert(ctx, db, ent)
+	lastID, err := doInsert(ctx, ent, db)
 	if err != nil {
 		if isConflictError(err, dbDriver(db)) {
 			return 0, ErrConflict
@@ -254,7 +254,7 @@ func Insert(ctx context.Context, db DB, ent Entity) (int64, error) {
 }
 
 // Update 更新entity
-func Update(ctx context.Context, db DB, ent Entity) error {
+func Update(ctx context.Context, ent Entity, db DB) error {
 	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
 	defer cancel()
 
@@ -262,7 +262,7 @@ func Update(ctx context.Context, db DB, ent Entity) error {
 		return fmt.Errorf("before update, %w", err)
 	}
 
-	if err := doUpdate(ctx, db, ent); err != nil {
+	if err := doUpdate(ctx, ent, db); err != nil {
 		return err
 	}
 
@@ -279,7 +279,7 @@ func Update(ctx context.Context, db DB, ent Entity) error {
 }
 
 // Delete 删除entity
-func Delete(ctx context.Context, db DB, ent Entity) error {
+func Delete(ctx context.Context, ent Entity, db DB) error {
 	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
 	defer cancel()
 
@@ -287,7 +287,7 @@ func Delete(ctx context.Context, db DB, ent Entity) error {
 		return fmt.Errorf("before delete, %w", err)
 	}
 
-	if err := doDelete(ctx, db, ent); err != nil {
+	if err := doDelete(ctx, ent, db); err != nil {
 		return err
 	}
 
@@ -304,7 +304,7 @@ func Delete(ctx context.Context, db DB, ent Entity) error {
 }
 
 // PrepareInsert returns a prepared insert statement for Entity
-func PrepareInsert(ctx context.Context, db DB, ent Entity) (*PrepareInsertStatement, error) {
+func PrepareInsert(ctx context.Context, ent Entity, db DB) (*PrepareInsertStatement, error) {
 	md, err := getMetadata(ent)
 	if err != nil {
 		return nil, fmt.Errorf("get metadata, %w", err)
@@ -324,7 +324,7 @@ func PrepareInsert(ctx context.Context, db DB, ent Entity) (*PrepareInsertStatem
 }
 
 // PrepareUpdate returns a prepared update statement for Entity
-func PrepareUpdate(ctx context.Context, db DB, ent Entity) (*PrepareUpdateStatement, error) {
+func PrepareUpdate(ctx context.Context, ent Entity, db DB) (*PrepareUpdateStatement, error) {
 	md, err := getMetadata(ent)
 	if err != nil {
 		return nil, fmt.Errorf("get metadata, %w", err)
