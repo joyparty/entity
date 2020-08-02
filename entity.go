@@ -240,7 +240,7 @@ func Insert(ctx context.Context, db DB, ent Entity) (int64, error) {
 
 	lastID, err := doInsert(ctx, db, ent)
 	if err != nil {
-		if isConflictError(db, err) {
+		if isConflictError(err, dbDriver(db)) {
 			return 0, ErrConflict
 		}
 		return 0, err
@@ -301,6 +301,46 @@ func Delete(ctx context.Context, db DB, ent Entity) error {
 		return fmt.Errorf("after delete, %w", err)
 	}
 	return nil
+}
+
+// PrepareInsert returns a prepared insert statement for Entity
+func PrepareInsert(ctx context.Context, db DB, ent Entity) (*PrepareInsertStatement, error) {
+	md, err := getMetadata(ent)
+	if err != nil {
+		return nil, fmt.Errorf("get metadata, %w", err)
+	}
+
+	query := getStatement(CommandInsert, md, dbDriver(db))
+	stmt, err := db.PrepareNamedContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+
+	return &PrepareInsertStatement{
+		md:       md,
+		stmt:     stmt,
+		dbDriver: dbDriver(db),
+	}, nil
+}
+
+// PrepareUpdate returns a prepared update statement for Entity
+func PrepareUpdate(ctx context.Context, db DB, ent Entity) (*PrepareUpdateStatement, error) {
+	md, err := getMetadata(ent)
+	if err != nil {
+		return nil, fmt.Errorf("get metadata, %w", err)
+	}
+
+	query := getStatement(CommandUpdate, md, dbDriver(db))
+	stmt, err := db.PrepareNamedContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+
+	return &PrepareUpdateStatement{
+		md:       md,
+		stmt:     stmt,
+		dbDriver: dbDriver(db),
+	}, nil
 }
 
 // Transaction 执行事务过程，根据结果选择提交或回滚

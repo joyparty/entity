@@ -11,10 +11,14 @@ import (
 )
 
 const (
-	cmdSelect = "select"
-	cmdInsert = "insert"
-	cmdUpdate = "update"
-	cmdDelete = "delete"
+	// CommandSelect is sql select from command
+	CommandSelect Command = "select"
+	// CommandInsert is sql insert into command
+	CommandInsert Command = "insert"
+	// CommandUpdate is sql update command
+	CommandUpdate Command = "update"
+	// CommandDelete is sql delete from command
+	CommandDelete Command = "delete"
 )
 
 var (
@@ -30,7 +34,14 @@ var (
 	driverAlias = map[string]string{
 		"pgx": driverPostgres,
 	}
+
+	// interface assert
+	_ DB = (*sqlx.DB)(nil)
+	_ DB = (*sqlx.Tx)(nil)
 )
+
+// Command is kind of CRUD command
+type Command string
 
 // DB 数据库接口
 // sqlx.DB 和 sqlx.Tx 公共方法
@@ -39,6 +50,8 @@ type DB interface {
 	sqlx.QueryerContext
 	sqlx.Execer
 	sqlx.ExecerContext
+	sqlx.Preparer
+	sqlx.PreparerContext
 	Get(dest interface{}, query string, args ...interface{}) error
 	GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error
 	Select(dest interface{}, query string, args ...interface{}) error
@@ -46,6 +59,10 @@ type DB interface {
 	NamedExec(query string, arg interface{}) (sql.Result, error)
 	NamedExecContext(ctx context.Context, query string, arg interface{}) (sql.Result, error)
 	NamedQuery(query string, arg interface{}) (*sqlx.Rows, error)
+	PrepareNamed(query string) (*sqlx.NamedStmt, error)
+	PrepareNamedContext(ctx context.Context, query string) (*sqlx.NamedStmt, error)
+	Preparex(query string) (*sqlx.Stmt, error)
+	PreparexContext(ctx context.Context, query string) (*sqlx.Stmt, error)
 	DriverName() string
 	Rebind(string) string
 	BindNamed(string, interface{}) (string, []interface{}, error)
@@ -59,9 +76,7 @@ func dbDriver(db DB) string {
 	return dv
 }
 
-func isConflictError(db DB, err error) bool {
-	driver := dbDriver(db)
-
+func isConflictError(err error, driver string) bool {
 	s := err.Error()
 	if driver == driverPostgres {
 		return strings.Contains(s, "duplicate key value violates unique constraint")
@@ -79,7 +94,7 @@ func doLoad(ctx context.Context, db DB, ent Entity) error {
 		return fmt.Errorf("get metadata, %w", err)
 	}
 
-	stmt := getStatement(cmdSelect, md, dbDriver(db))
+	stmt := getStatement(CommandSelect, md, dbDriver(db))
 	rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
 	if err != nil {
 		return err
@@ -103,7 +118,7 @@ func doInsert(ctx context.Context, db DB, ent Entity) (int64, error) {
 		return 0, fmt.Errorf("get metadata, %w", err)
 	}
 
-	stmt := getStatement(cmdInsert, md, dbDriver(db))
+	stmt := getStatement(CommandInsert, md, dbDriver(db))
 	if md.hasReturningInsert {
 		rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
 		if err != nil {
@@ -133,7 +148,10 @@ func doInsert(ctx context.Context, db DB, ent Entity) (int64, error) {
 	}
 
 	lastID, err := result.LastInsertId()
-	return lastID, fmt.Errorf("get last insert id, %w", err)
+	if err != nil {
+		return 0, fmt.Errorf("get last insert id, %w", err)
+	}
+	return lastID, nil
 }
 
 func doUpdate(ctx context.Context, db DB, ent Entity) error {
@@ -142,7 +160,7 @@ func doUpdate(ctx context.Context, db DB, ent Entity) error {
 		return fmt.Errorf("get metadata, %w", err)
 	}
 
-	stmt := getStatement(cmdUpdate, md, dbDriver(db))
+	stmt := getStatement(CommandUpdate, md, dbDriver(db))
 	if md.hasReturningUpdate {
 		rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
 		if err != nil {
@@ -181,28 +199,28 @@ func doDelete(ctx context.Context, db DB, ent Entity) error {
 		return fmt.Errorf("get metadata, %w", err)
 	}
 
-	stmt := getStatement(cmdDelete, md, dbDriver(db))
+	stmt := getStatement(CommandDelete, md, dbDriver(db))
 	_, err = db.NamedExecContext(ctx, stmt, ent)
 	return err
 }
 
-func getStatement(cmd string, md *Metadata, driver string) string {
+func getStatement(cmd Command, md *Metadata, driver string) string {
 	var (
 		m  map[reflect.Type]string
 		fn func(*Metadata, string) string
 	)
 
 	switch cmd {
-	case cmdSelect:
+	case CommandSelect:
 		m = selectStatements
 		fn = newSelectStatement
-	case cmdInsert:
+	case CommandInsert:
 		m = insertStatements
 		fn = newInsertStatement
-	case cmdUpdate:
+	case CommandUpdate:
 		m = updateStatements
 		fn = newUpdateStatement
-	case cmdDelete:
+	case CommandDelete:
 		m = deleteStatements
 		fn = newDeleteStatement
 	default:
@@ -335,4 +353,116 @@ func quoteIdentifier(name string, driver string) string {
 	}
 
 	return strings.Join(result, ".")
+}
+
+// PrepareInsertStatement is a prepared insert statement for entity
+type PrepareInsertStatement struct {
+	md       *Metadata
+	stmt     *sqlx.NamedStmt
+	dbDriver string
+}
+
+// Close closes the prepared statement
+func (pis *PrepareInsertStatement) Close() error {
+	return pis.stmt.Close()
+}
+
+// ExecContext executes a prepared insert statement using the Entity passed.
+func (pis *PrepareInsertStatement) ExecContext(ctx context.Context, ent Entity) (lastID int64, err error) {
+	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
+	defer cancel()
+
+	if err := ent.OnEntityEvent(ctx, EventBeforeInsert); err != nil {
+		return 0, fmt.Errorf("before insert, %w", err)
+	}
+
+	lastID, err = pis.execContext(ctx, ent)
+	if err != nil {
+		if isConflictError(err, pis.dbDriver) {
+			return 0, ErrConflict
+		}
+		return 0, err
+	}
+
+	if err := ent.OnEntityEvent(ctx, EventAfterInsert); err != nil {
+		return 0, fmt.Errorf("after insert, %w", err)
+	}
+
+	return lastID, nil
+}
+
+func (pis *PrepareInsertStatement) execContext(ctx context.Context, ent Entity) (lastID int64, err error) {
+	if pis.md.hasReturningInsert {
+		err := pis.stmt.QueryRowxContext(ctx, ent).StructScan(ent)
+		return 0, err
+	}
+
+	result, err := pis.stmt.ExecContext(ctx, ent)
+	if err != nil {
+		return 0, err
+	} else if pis.dbDriver == driverPostgres {
+		// postgresql不支持LastInsertId特性
+		return 0, nil
+	}
+
+	lastID, err = result.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("get last insert id, %w", err)
+	}
+	return lastID, nil
+}
+
+// PrepareUpdateStatement is a prepared update statement for entity
+type PrepareUpdateStatement struct {
+	md       *Metadata
+	stmt     *sqlx.NamedStmt
+	dbDriver string
+}
+
+// Close closes the prepared statement
+func (pus *PrepareUpdateStatement) Close() error {
+	return pus.stmt.Close()
+}
+
+// ExecContext executes a prepared update statement using the Entity passed.
+func (pus *PrepareUpdateStatement) ExecContext(ctx context.Context, ent Entity) error {
+	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
+	defer cancel()
+
+	if err := ent.OnEntityEvent(ctx, EventBeforeUpdate); err != nil {
+		return fmt.Errorf("before update, %w", err)
+	}
+
+	if err := pus.execContext(ctx, ent); err != nil {
+		return err
+	}
+
+	if v, ok := ent.(Cacheable); ok {
+		if err := DeleteCache(v); err != nil {
+			return fmt.Errorf("delete cache, %w", err)
+		}
+	}
+
+	if err := ent.OnEntityEvent(ctx, EventAfterUpdate); err != nil {
+		return fmt.Errorf("after update, %w", err)
+	}
+	return nil
+}
+
+func (pus *PrepareUpdateStatement) execContext(ctx context.Context, ent Entity) error {
+	if pus.md.hasReturningUpdate {
+		return pus.stmt.QueryRowxContext(ctx, ent).StructScan(ent)
+	}
+
+	result, err := pus.stmt.ExecContext(ctx, ent)
+	if err != nil {
+		return err
+	}
+
+	if n, err := result.RowsAffected(); err != nil {
+		return fmt.Errorf("get affected rows, %w", err)
+	} else if n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
