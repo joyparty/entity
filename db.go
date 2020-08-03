@@ -10,19 +10,30 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+const (
+	commandSelect = "select"
+	commandInsert = "insert"
+	commandUpdate = "update"
+	commandDelete = "delete"
+
+	driverMysql    = "mysql"
+	driverPostgres = "postgres"
+	driverSqlite3  = "sqlite3"
+)
+
 var (
 	selectStatements = map[reflect.Type]string{}
 	insertStatements = map[reflect.Type]string{}
 	updateStatements = map[reflect.Type]string{}
 	deleteStatements = map[reflect.Type]string{}
 
-	driverMysql    = "mysql"
-	driverPostgres = "postgres"
-	driverSqlite3  = "sqlite3"
-
 	driverAlias = map[string]string{
 		"pgx": driverPostgres,
 	}
+
+	// interface assert
+	_ DB = (*sqlx.DB)(nil)
+	_ DB = (*sqlx.Tx)(nil)
 )
 
 // DB 数据库接口
@@ -32,6 +43,8 @@ type DB interface {
 	sqlx.QueryerContext
 	sqlx.Execer
 	sqlx.ExecerContext
+	sqlx.Preparer
+	sqlx.PreparerContext
 	Get(dest interface{}, query string, args ...interface{}) error
 	GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error
 	Select(dest interface{}, query string, args ...interface{}) error
@@ -39,6 +52,10 @@ type DB interface {
 	NamedExec(query string, arg interface{}) (sql.Result, error)
 	NamedExecContext(ctx context.Context, query string, arg interface{}) (sql.Result, error)
 	NamedQuery(query string, arg interface{}) (*sqlx.Rows, error)
+	PrepareNamed(query string) (*sqlx.NamedStmt, error)
+	PrepareNamedContext(ctx context.Context, query string) (*sqlx.NamedStmt, error)
+	Preparex(query string) (*sqlx.Stmt, error)
+	PreparexContext(ctx context.Context, query string) (*sqlx.Stmt, error)
 	DriverName() string
 	Rebind(string) string
 	BindNamed(string, interface{}) (string, []interface{}, error)
@@ -52,9 +69,7 @@ func dbDriver(db DB) string {
 	return dv
 }
 
-func isConflictError(db DB, err error) bool {
-	driver := dbDriver(db)
-
+func isConflictError(err error, driver string) bool {
 	s := err.Error()
 	if driver == driverPostgres {
 		return strings.Contains(s, "duplicate key value violates unique constraint")
@@ -72,12 +87,7 @@ func doLoad(ctx context.Context, ent Entity, db DB) error {
 		return fmt.Errorf("get metadata, %w", err)
 	}
 
-	stmt, ok := selectStatements[md.Type]
-	if !ok {
-		stmt = selectStatement(ent, md, dbDriver(db))
-		selectStatements[md.Type] = stmt
-	}
-
+	stmt := getStatement(commandSelect, md, dbDriver(db))
 	rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
 	if err != nil {
 		return err
@@ -101,12 +111,7 @@ func doInsert(ctx context.Context, ent Entity, db DB) (int64, error) {
 		return 0, fmt.Errorf("get metadata, %w", err)
 	}
 
-	stmt, ok := insertStatements[md.Type]
-	if !ok {
-		stmt = insertStatement(ent, md, dbDriver(db))
-		insertStatements[md.Type] = stmt
-	}
-
+	stmt := getStatement(commandInsert, md, dbDriver(db))
 	if md.hasReturningInsert {
 		rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
 		if err != nil {
@@ -136,7 +141,10 @@ func doInsert(ctx context.Context, ent Entity, db DB) (int64, error) {
 	}
 
 	lastID, err := result.LastInsertId()
-	return lastID, fmt.Errorf("get last insert id, %w", err)
+	if err != nil {
+		return 0, fmt.Errorf("get last insert id, %w", err)
+	}
+	return lastID, nil
 }
 
 func doUpdate(ctx context.Context, ent Entity, db DB) error {
@@ -145,12 +153,7 @@ func doUpdate(ctx context.Context, ent Entity, db DB) error {
 		return fmt.Errorf("get metadata, %w", err)
 	}
 
-	stmt, ok := updateStatements[md.Type]
-	if !ok {
-		stmt = updateStatement(ent, md, dbDriver(db))
-		updateStatements[md.Type] = stmt
-	}
-
+	stmt := getStatement(commandUpdate, md, dbDriver(db))
 	if md.hasReturningUpdate {
 		rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
 		if err != nil {
@@ -181,7 +184,6 @@ func doUpdate(ctx context.Context, ent Entity, db DB) error {
 	}
 
 	return nil
-
 }
 
 func doDelete(ctx context.Context, ent Entity, db DB) error {
@@ -190,17 +192,44 @@ func doDelete(ctx context.Context, ent Entity, db DB) error {
 		return fmt.Errorf("get metadata, %w", err)
 	}
 
-	stmt, ok := deleteStatements[md.Type]
-	if !ok {
-		stmt = deleteStatement(ent, md, dbDriver(db))
-		deleteStatements[md.Type] = stmt
-	}
-
+	stmt := getStatement(commandDelete, md, dbDriver(db))
 	_, err = db.NamedExecContext(ctx, stmt, ent)
 	return err
 }
 
-func selectStatement(ent Entity, md *Metadata, driver string) string {
+func getStatement(cmd string, md *Metadata, driver string) string {
+	var (
+		m  map[reflect.Type]string
+		fn func(*Metadata, string) string
+	)
+
+	switch cmd {
+	case commandSelect:
+		m = selectStatements
+		fn = newSelectStatement
+	case commandInsert:
+		m = insertStatements
+		fn = newInsertStatement
+	case commandUpdate:
+		m = updateStatements
+		fn = newUpdateStatement
+	case commandDelete:
+		m = deleteStatements
+		fn = newDeleteStatement
+	default:
+		panic(fmt.Errorf("unimplemented command %q", cmd))
+	}
+
+	if stmt, ok := m[md.Type]; ok {
+		return stmt
+	}
+
+	stmt := fn(md, driver)
+	m[md.Type] = stmt
+	return stmt
+}
+
+func newSelectStatement(md *Metadata, driver string) string {
 	columns := []string{}
 	for _, col := range md.Columns {
 		columns = append(columns, quoteColumn(col.DBField, driver))
@@ -219,7 +248,7 @@ func selectStatement(ent Entity, md *Metadata, driver string) string {
 	return stmt
 }
 
-func insertStatement(ent Entity, md *Metadata, driver string) string {
+func newInsertStatement(md *Metadata, driver string) string {
 	columns := []string{}
 	returnings := []string{}
 	placeholder := []string{}
@@ -248,7 +277,7 @@ func insertStatement(ent Entity, md *Metadata, driver string) string {
 	return stmt
 }
 
-func updateStatement(ent Entity, md *Metadata, driver string) string {
+func newUpdateStatement(md *Metadata, driver string) string {
 	returnings := []string{}
 	stmt := fmt.Sprintf("UPDATE %s SET", quoteIdentifier(md.TableName, driver))
 
@@ -281,7 +310,7 @@ func updateStatement(ent Entity, md *Metadata, driver string) string {
 	return stmt
 }
 
-func deleteStatement(ent Entity, md *Metadata, driver string) string {
+func newDeleteStatement(md *Metadata, driver string) string {
 	stmt := fmt.Sprintf("DELETE FROM %s WHERE", quoteIdentifier(md.TableName, driver))
 	for i, col := range md.PrimaryKeys {
 		if i == 0 {

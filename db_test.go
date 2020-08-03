@@ -9,13 +9,13 @@ func TestStatement(t *testing.T) {
 	t.Run("select", func(t *testing.T) {
 		md, _ := newTestMetadata(&GenernalEntity{})
 
-		stmt := selectStatement(&GenernalEntity{}, md, driverMysql)
+		stmt := newSelectStatement(md, driverMysql)
 		expected := "SELECT `create_at`, `extra`, `id`, `id2`, `name`, `version` FROM `genernal` WHERE `id` = :id AND `id2` = :id2 LIMIT 1"
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
 
-		stmt = selectStatement(&GenernalEntity{}, md, driverPostgres)
+		stmt = newSelectStatement(md, driverPostgres)
 		expected = `SELECT "create_at", "extra", "id", "id2", "name", "version" FROM "genernal" WHERE "id" = :id AND "id2" = :id2 LIMIT 1`
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
@@ -25,13 +25,13 @@ func TestStatement(t *testing.T) {
 	t.Run("insert", func(t *testing.T) {
 		md, _ := newTestMetadata(&GenernalEntity{})
 
-		stmt := insertStatement(&GenernalEntity{}, md, driverMysql)
+		stmt := newInsertStatement(md, driverMysql)
 		expected := "INSERT INTO `genernal` (`extra`, `id2`, `name`) VALUES (:extra, :id2, :name) RETURNING `create_at`, `version`"
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
 
-		stmt = insertStatement(&GenernalEntity{}, md, driverPostgres)
+		stmt = newInsertStatement(md, driverPostgres)
 		expected = `INSERT INTO "genernal" ("extra", "id2", "name") VALUES (:extra, :id2, :name) RETURNING "create_at", "version"`
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
@@ -41,13 +41,13 @@ func TestStatement(t *testing.T) {
 	t.Run("update", func(t *testing.T) {
 		md, _ := newTestMetadata(&GenernalEntity{})
 
-		stmt := updateStatement(&GenernalEntity{}, md, driverMysql)
+		stmt := newUpdateStatement(md, driverMysql)
 		expected := "UPDATE `genernal` SET `extra` = :extra, `name` = :name WHERE `id` = :id AND `id2` = :id2 RETURNING `version`"
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
 
-		stmt = updateStatement(&GenernalEntity{}, md, driverPostgres)
+		stmt = newUpdateStatement(md, driverPostgres)
 		expected = `UPDATE "genernal" SET "extra" = :extra, "name" = :name WHERE "id" = :id AND "id2" = :id2 RETURNING "version"`
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
@@ -57,13 +57,13 @@ func TestStatement(t *testing.T) {
 	t.Run("delete", func(t *testing.T) {
 		md, _ := newTestMetadata(&GenernalEntity{})
 
-		stmt := deleteStatement(&GenernalEntity{}, md, driverMysql)
+		stmt := newDeleteStatement(md, driverMysql)
 		expected := "DELETE FROM `genernal` WHERE `id` = :id AND `id2` = :id2"
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
 		}
 
-		stmt = deleteStatement(&GenernalEntity{}, md, driverPostgres)
+		stmt = newDeleteStatement(md, driverPostgres)
 		expected = `DELETE FROM "genernal" WHERE "id" = :id AND "id2" = :id2`
 		if stmt != expected {
 			t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
