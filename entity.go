@@ -403,9 +403,8 @@ func (pis *PrepareInsertStatement) execContext(ctx context.Context, ent Entity) 
 
 // PrepareUpdateStatement is a prepared update statement for entity
 type PrepareUpdateStatement struct {
-	md       *Metadata
-	stmt     *sqlx.NamedStmt
-	dbDriver string
+	md   *Metadata
+	stmt *sqlx.NamedStmt
 }
 
 // PrepareUpdate returns a prepared update statement for Entity
@@ -422,9 +421,8 @@ func PrepareUpdate(ctx context.Context, ent Entity, db DB) (*PrepareUpdateStatem
 	}
 
 	return &PrepareUpdateStatement{
-		md:       md,
-		stmt:     stmt,
-		dbDriver: dbDriver(db),
+		md:   md,
+		stmt: stmt,
 	}, nil
 }
 
