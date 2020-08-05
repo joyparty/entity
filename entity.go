@@ -304,26 +304,6 @@ func Delete(ctx context.Context, ent Entity, db DB) error {
 	return nil
 }
 
-// Transaction 执行事务过程，根据结果选择提交或回滚
-func Transaction(db *sqlx.DB, fn func(tx *sqlx.Tx) error) (err error) {
-	tx, err := db.Beginx()
-	if err != nil {
-		return fmt.Errorf("begin transaction, %w", err)
-	}
-
-	defer func() {
-		if err == nil {
-			if txErr := tx.Commit(); txErr != nil {
-				err = fmt.Errorf("commit transaction, %w", txErr)
-			}
-		} else {
-			_ = tx.Rollback()
-		}
-	}()
-
-	return fn(tx)
-}
-
 // PrepareInsertStatement is a prepared insert statement for entity
 type PrepareInsertStatement struct {
 	md       *Metadata

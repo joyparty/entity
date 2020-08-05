@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/doug-martin/goqu/v9"
+	"github.com/jmoiron/sqlx"
 )
 
 // 封装了一些goqu的快捷调用
@@ -59,4 +60,24 @@ func GetTotalCount(ctx context.Context, db DB, stmt *goqu.SelectDataset) (int, e
 		return 0, err
 	}
 	return total, nil
+}
+
+// Transaction 执行事务过程，根据结果选择提交或回滚
+func Transaction(db *sqlx.DB, fn func(tx *sqlx.Tx) error) (err error) {
+	tx, err := db.Beginx()
+	if err != nil {
+		return fmt.Errorf("begin transaction, %w", err)
+	}
+
+	defer func() {
+		if err == nil {
+			if txErr := tx.Commit(); txErr != nil {
+				err = fmt.Errorf("commit transaction, %w", txErr)
+			}
+		} else {
+			_ = tx.Rollback()
+		}
+	}()
+
+	return fn(tx)
 }
