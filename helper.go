@@ -13,7 +13,11 @@ import (
 
 // ExecUpdate 执行更新语句
 func ExecUpdate(ctx context.Context, db DB, stmt *goqu.UpdateDataset) (sql.Result, error) {
-	query, args, err := stmt.Prepared(true).ToSQL()
+	if !stmt.IsPrepared() {
+		stmt = stmt.Prepared(true)
+	}
+
+	query, args, err := stmt.ToSQL()
 	if err != nil {
 		return nil, fmt.Errorf("build update statement, %w", err)
 	}
@@ -22,6 +26,10 @@ func ExecUpdate(ctx context.Context, db DB, stmt *goqu.UpdateDataset) (sql.Resul
 
 // ExecDelete 执行删除语句
 func ExecDelete(ctx context.Context, db DB, stmt *goqu.DeleteDataset) (sql.Result, error) {
+	if !stmt.IsPrepared() {
+		stmt = stmt.Prepared(true)
+	}
+
 	query, args, err := stmt.Prepared(true).ToSQL()
 	if err != nil {
 		return nil, fmt.Errorf("build delete statement, %w", err)
@@ -31,7 +39,11 @@ func ExecDelete(ctx context.Context, db DB, stmt *goqu.DeleteDataset) (sql.Resul
 
 // GetRecode 执行查询语句，返回单条结果
 func GetRecode(ctx context.Context, dest interface{}, db DB, stmt *goqu.SelectDataset) error {
-	query, args, err := stmt.Prepared(true).ToSQL()
+	if !stmt.IsPrepared() {
+		stmt = stmt.Prepared(true)
+	}
+
+	query, args, err := stmt.ToSQL()
 	if err != nil {
 		return fmt.Errorf("build select statement, %w", err)
 	}
@@ -40,7 +52,11 @@ func GetRecode(ctx context.Context, dest interface{}, db DB, stmt *goqu.SelectDa
 
 // GetRecodes 执行查询语句，返回多条结果
 func GetRecodes(ctx context.Context, dest interface{}, db DB, stmt *goqu.SelectDataset) error {
-	query, args, err := stmt.Prepared(true).ToSQL()
+	if !stmt.IsPrepared() {
+		stmt = stmt.Prepared(true)
+	}
+
+	query, args, err := stmt.ToSQL()
 	if err != nil {
 		return fmt.Errorf("build select statement, %w", err)
 	}
@@ -49,11 +65,14 @@ func GetRecodes(ctx context.Context, dest interface{}, db DB, stmt *goqu.SelectD
 
 // GetTotalCount 符合条件的总记录数量
 func GetTotalCount(ctx context.Context, db DB, stmt *goqu.SelectDataset) (int, error) {
-	stmt = stmt.
-		Select(goqu.L(`count(1)`)).
-		ClearOrder().
-		ClearLimit().
-		ClearOffset()
+	stmt = stmt.Select(goqu.L(`count(1)`))
+	clauses := stmt.GetClauses()
+	if clauses.HasOrder() {
+		stmt = stmt.ClearOrder()
+	}
+	if clauses.HasLimit() {
+		stmt = stmt.ClearLimit().ClearOffset()
+	}
 
 	var total int
 	if err := GetRecode(ctx, &total, db, stmt); err != nil {
