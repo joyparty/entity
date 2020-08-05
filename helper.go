@@ -37,8 +37,8 @@ func ExecDelete(ctx context.Context, db DB, stmt *goqu.DeleteDataset) (sql.Resul
 	return db.ExecContext(ctx, query, args...)
 }
 
-// GetRecode 执行查询语句，返回单条结果
-func GetRecode(ctx context.Context, dest interface{}, db DB, stmt *goqu.SelectDataset) error {
+// GetRecorde 执行查询语句，返回单条结果
+func GetRecorde(ctx context.Context, dest interface{}, db DB, stmt *goqu.SelectDataset) error {
 	if !stmt.IsPrepared() {
 		stmt = stmt.Prepared(true)
 	}
@@ -50,8 +50,8 @@ func GetRecode(ctx context.Context, dest interface{}, db DB, stmt *goqu.SelectDa
 	return db.GetContext(ctx, dest, query, args...)
 }
 
-// GetRecodes 执行查询语句，返回多条结果
-func GetRecodes(ctx context.Context, dest interface{}, db DB, stmt *goqu.SelectDataset) error {
+// GetRecordes 执行查询语句，返回多条结果
+func GetRecordes(ctx context.Context, dest interface{}, db DB, stmt *goqu.SelectDataset) error {
 	if !stmt.IsPrepared() {
 		stmt = stmt.Prepared(true)
 	}
@@ -75,7 +75,7 @@ func GetTotalCount(ctx context.Context, db DB, stmt *goqu.SelectDataset) (int, e
 	}
 
 	var total int
-	if err := GetRecode(ctx, &total, db, stmt); err != nil {
+	if err := GetRecorde(ctx, &total, db, stmt); err != nil {
 		return 0, err
 	}
 	return total, nil
