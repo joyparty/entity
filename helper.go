@@ -11,6 +11,19 @@ import (
 
 // 封装了一些goqu的快捷调用
 
+// ExecInsert 执行插入语句
+func ExecInsert(ctx context.Context, db DB, stmt *goqu.InsertDataset) (sql.Result, error) {
+	if !stmt.IsPrepared() {
+		stmt = stmt.Prepared(true)
+	}
+
+	query, args, err := stmt.ToSQL()
+	if err != nil {
+		return nil, fmt.Errorf("build insert statement, %w", err)
+	}
+	return db.ExecContext(ctx, query, args...)
+}
+
 // ExecUpdate 执行更新语句
 func ExecUpdate(ctx context.Context, db DB, stmt *goqu.UpdateDataset) (sql.Result, error) {
 	if !stmt.IsPrepared() {
