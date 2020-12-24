@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -26,6 +27,8 @@ var (
 	insertStatements = map[reflect.Type]string{}
 	updateStatements = map[reflect.Type]string{}
 	deleteStatements = map[reflect.Type]string{}
+
+	statementsMux sync.RWMutex
 
 	driverAlias = map[string]string{
 		"pgx": driverPostgres,
@@ -220,11 +223,17 @@ func getStatement(cmd string, md *Metadata, driver string) string {
 		panic(fmt.Errorf("unimplemented command %q", cmd))
 	}
 
-	if stmt, ok := m[md.Type]; ok {
+	statementsMux.RLock()
+	stmt, ok := m[md.Type]
+	statementsMux.RUnlock()
+	if ok {
 		return stmt
 	}
 
-	stmt := fn(md, driver)
+	statementsMux.Lock()
+	defer statementsMux.Unlock()
+
+	stmt = fn(md, driver)
 	m[md.Type] = stmt
 	return stmt
 }
