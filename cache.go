@@ -3,6 +3,7 @@ package entity
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"time"
@@ -20,9 +21,9 @@ type Cacheable interface {
 
 // Cacher 缓存数据存储接口
 type Cacher interface {
-	Get(key string) ([]byte, error)
-	Put(key string, data []byte, expiration time.Duration) error
-	Delete(key string) error
+	Get(ctx context.Context, key string) ([]byte, error)
+	Put(ctx context.Context, key string, data []byte, expiration time.Duration) error
+	Delete(ctx context.Context, key string) error
 }
 
 // CacheOption 缓存参数
@@ -36,13 +37,13 @@ type CacheOption struct {
 	RecursiveDecode []string
 }
 
-func loadCache(ent Cacheable) (bool, error) {
+func loadCache(ctx context.Context, ent Cacheable) (bool, error) {
 	opt, err := getCacheOption(ent)
 	if err != nil {
 		return false, fmt.Errorf("get option, %w", err)
 	}
 
-	data, err := opt.Cacher.Get(opt.Key)
+	data, err := opt.Cacher.Get(ctx, opt.Key)
 	if err != nil {
 		return false, err
 	} else if len(data) == 0 {
@@ -79,7 +80,7 @@ func loadCache(ent Cacheable) (bool, error) {
 }
 
 // SaveCache 保存entity缓存
-func SaveCache(ent Cacheable) error {
+func SaveCache(ctx context.Context, ent Cacheable) error {
 	data, err := jsoniter.Marshal(ent)
 	if err != nil {
 		return fmt.Errorf("json encode, %w", err)
@@ -102,17 +103,17 @@ func SaveCache(ent Cacheable) error {
 		data = zdata.Bytes()
 	}
 
-	return opt.Cacher.Put(opt.Key, data, opt.Expiration)
+	return opt.Cacher.Put(ctx, opt.Key, data, opt.Expiration)
 }
 
 // DeleteCache 删除entity缓存
-func DeleteCache(ent Cacheable) error {
+func DeleteCache(ctx context.Context, ent Cacheable) error {
 	opt, err := getCacheOption(ent)
 	if err != nil {
 		return fmt.Errorf("get option, %w", err)
 	}
 
-	return opt.Cacher.Delete(opt.Key)
+	return opt.Cacher.Delete(ctx, opt.Key)
 }
 
 func getCacheOption(ent Cacheable) (CacheOption, error) {

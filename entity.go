@@ -210,7 +210,7 @@ func Load(ctx context.Context, ent Entity, db DB) error {
 
 	cv, cacheable := ent.(Cacheable)
 	if cacheable {
-		if loaded, err := loadCache(cv); err != nil {
+		if loaded, err := loadCache(ctx, cv); err != nil {
 			return fmt.Errorf("load from cache, %w", err)
 		} else if loaded {
 			return nil
@@ -222,7 +222,7 @@ func Load(ctx context.Context, ent Entity, db DB) error {
 	}
 
 	if cacheable {
-		if err := SaveCache(cv); err != nil {
+		if err := SaveCache(ctx, cv); err != nil {
 			return fmt.Errorf("save cache, %w", err)
 		}
 	}
@@ -268,7 +268,7 @@ func Update(ctx context.Context, ent Entity, db DB) error {
 	}
 
 	if v, ok := ent.(Cacheable); ok {
-		if err := DeleteCache(v); err != nil {
+		if err := DeleteCache(ctx, v); err != nil {
 			return fmt.Errorf("delete cache, %w", err)
 		}
 	}
@@ -293,7 +293,7 @@ func Delete(ctx context.Context, ent Entity, db DB) error {
 	}
 
 	if v, ok := ent.(Cacheable); ok {
-		if err := DeleteCache(v); err != nil {
+		if err := DeleteCache(ctx, v); err != nil {
 			return fmt.Errorf("delete cache, %w", err)
 		}
 	}
@@ -425,7 +425,7 @@ func (pus *PrepareUpdateStatement) ExecContext(ctx context.Context, ent Entity) 
 	}
 
 	if v, ok := ent.(Cacheable); ok {
-		if err := DeleteCache(v); err != nil {
+		if err := DeleteCache(ctx, v); err != nil {
 			return fmt.Errorf("delete cache, %w", err)
 		}
 	}

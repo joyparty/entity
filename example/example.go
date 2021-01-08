@@ -114,14 +114,14 @@ func DeleteUserTx(ctx context.Context, u *User, tx *sqlx.Tx) error {
 
 type fakeCacher struct{}
 
-func (fc *fakeCacher) Get(key string) ([]byte, error) {
+func (fc *fakeCacher) Get(_ context.Context, key string) ([]byte, error) {
 	return []byte{}, nil
 }
 
-func (fc *fakeCacher) Put(key string, data []byte, expiration time.Duration) error {
+func (fc *fakeCacher) Put(_ context.Context, key string, data []byte, expiration time.Duration) error {
 	return nil
 }
 
-func (fc *fakeCacher) Delete(key string) error {
+func (fc *fakeCacher) Delete(_ context.Context, key string) error {
 	return nil
 }
