@@ -1,5 +1,7 @@
 ## 介绍
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/joyparty/entity.svg)](https://pkg.go.dev/github.com/joyparty/entity)
+
 基于sqlx库，封装了实体对象的基本CRUD方法，除数据库读写外，还实现了自定义缓存机制，在数据库读写过程中，自动使用和更新缓存
 
 样例代码见[example.go](./example/example.go)内
