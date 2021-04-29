@@ -32,8 +32,6 @@ type CacheOption struct {
 	Key        string
 	Expiration time.Duration
 	Compress   bool
-	// 如果设置为true，entity实例的缓存功能会被关闭
-	Disable bool
 	// 某些由其它地方构造的缓存，其中存在字段内容进入缓存前先被json encode过
 	// 这些字段缓存结果需要被decode两次才能使用
 	RecursiveDecode []string
@@ -43,9 +41,6 @@ func loadCache(ctx context.Context, ent Cacheable) (bool, error) {
 	opt, err := getCacheOption(ent)
 	if err != nil {
 		return false, fmt.Errorf("get option, %w", err)
-	}
-	if opt.Disable {
-		return false, nil
 	}
 
 	data, err := opt.Cacher.Get(ctx, opt.Key)
@@ -90,9 +85,6 @@ func SaveCache(ctx context.Context, ent Cacheable) error {
 	if err != nil {
 		return fmt.Errorf("get option, %w", err)
 	}
-	if opt.Disable {
-		return nil
-	}
 
 	data, err := jsoniter.Marshal(ent)
 	if err != nil {
@@ -119,9 +111,6 @@ func DeleteCache(ctx context.Context, ent Cacheable) error {
 	opt, err := getCacheOption(ent)
 	if err != nil {
 		return fmt.Errorf("get option, %w", err)
-	}
-	if opt.Disable {
-		return nil
 	}
 
 	return opt.Cacher.Delete(ctx, opt.Key)
