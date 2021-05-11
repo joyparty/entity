@@ -32,6 +32,10 @@ type CacheOption struct {
 	Key        string
 	Expiration time.Duration
 	Compress   bool
+	// 如果为true，将不会生成缓存
+	// 这个配置只控制缓存的生成，不控制缓存的读取
+	// 因为在没有读到数据之前，没有足够的信息进行判断
+	Disable bool
 	// 某些由其它地方构造的缓存，其中存在字段内容进入缓存前先被json encode过
 	// 这些字段缓存结果需要被decode两次才能使用
 	RecursiveDecode []string
@@ -84,6 +88,8 @@ func SaveCache(ctx context.Context, ent Cacheable) error {
 	opt, err := getCacheOption(ent)
 	if err != nil {
 		return fmt.Errorf("get option, %w", err)
+	} else if opt.Disable {
+		return nil
 	}
 
 	data, err := jsoniter.Marshal(ent)
