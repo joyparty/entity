@@ -103,11 +103,13 @@ func Transaction(db *sqlx.DB, fn func(tx *sqlx.Tx) error) (err error) {
 
 	defer func() {
 		if err == nil {
-			if txErr := tx.Commit(); txErr != nil {
-				err = fmt.Errorf("commit transaction, %w", txErr)
+			if errCommit := tx.Commit(); errCommit != nil {
+				err = fmt.Errorf("commit transaction, %w", errCommit)
 			}
 		} else {
-			_ = tx.Rollback()
+			if errRollback := tx.Rollback(); errRollback != nil {
+				err = fmt.Errorf("rollback transaction, %v, caused by %w", errRollback, err)
+			}
 		}
 	}()
 
