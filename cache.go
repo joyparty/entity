@@ -4,11 +4,10 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"time"
-
-	jsoniter "github.com/json-iterator/go"
 )
 
 // DefaultCacher 默认缓存存储
@@ -77,7 +76,7 @@ func loadCache(ctx context.Context, ent Cacheable) (bool, error) {
 		}
 	}
 
-	if err := jsoniter.Unmarshal(data, ent); err != nil {
+	if err := json.Unmarshal(data, ent); err != nil {
 		return false, fmt.Errorf("json decode, %w", err)
 	}
 	return true, nil
@@ -92,7 +91,7 @@ func SaveCache(ctx context.Context, ent Cacheable) error {
 		return nil
 	}
 
-	data, err := jsoniter.Marshal(ent)
+	data, err := json.Marshal(ent)
 	if err != nil {
 		return fmt.Errorf("json encode, %w", err)
 	}
@@ -145,22 +144,22 @@ func getCacheOption(ent Cacheable) (CacheOption, error) {
 }
 
 func recursiveDecode(data []byte, keys []string) ([]byte, error) {
-	if len(keys) == 0 || jsoniter.Get(data).ValueType() != jsoniter.ObjectValue {
+	if len(keys) == 0 || len(data) == 0 || data[0] != '{' {
 		return nil, nil
 	}
 
-	vals := map[string]jsoniter.RawMessage{}
-	if err := jsoniter.Unmarshal(data, &vals); err != nil {
+	vals := map[string]json.RawMessage{}
+	if err := json.Unmarshal(data, &vals); err != nil {
 		return nil, err
 	}
 
 	fixed := false
 	for _, key := range keys {
-		if jsoniter.Get(vals[key]).ValueType() == jsoniter.StringValue {
+		if data, ok := vals[key]; ok && len(data) > 0 && data[0] == '"' {
 			fixed = true
 
 			var s string
-			if err := jsoniter.Unmarshal(vals[key], &s); err != nil {
+			if err := json.Unmarshal(data, &s); err != nil {
 				return nil, err
 			}
 
@@ -172,7 +171,7 @@ func recursiveDecode(data []byte, keys []string) ([]byte, error) {
 		return nil, nil
 	}
 
-	encoded, err := jsoniter.Marshal(vals)
+	encoded, err := json.Marshal(vals)
 	if err != nil {
 		return nil, err
 	}
