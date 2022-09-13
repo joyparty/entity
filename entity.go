@@ -383,8 +383,9 @@ func (pis *PrepareInsertStatement) execContext(ctx context.Context, ent Entity) 
 
 // PrepareUpdateStatement is a prepared update statement for entity
 type PrepareUpdateStatement struct {
-	md   *Metadata
-	stmt *sqlx.NamedStmt
+	md       *Metadata
+	stmt     *sqlx.NamedStmt
+	dbDriver string
 }
 
 // PrepareUpdate returns a prepared update statement for Entity
@@ -394,15 +395,17 @@ func PrepareUpdate(ctx context.Context, ent Entity, db DB) (*PrepareUpdateStatem
 		return nil, fmt.Errorf("get metadata, %w", err)
 	}
 
-	query := getStatement(commandUpdate, md, dbDriver(db))
+	driver := dbDriver(db)
+	query := getStatement(commandUpdate, md, driver)
 	stmt, err := db.PrepareNamedContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
 
 	return &PrepareUpdateStatement{
-		md:   md,
-		stmt: stmt,
+		md:       md,
+		stmt:     stmt,
+		dbDriver: driver,
 	}, nil
 }
 
@@ -421,6 +424,9 @@ func (pus *PrepareUpdateStatement) ExecContext(ctx context.Context, ent Entity) 
 	}
 
 	if err := pus.execContext(ctx, ent); err != nil {
+		if isConflictError(err, pus.dbDriver) {
+			return ErrConflict
+		}
 		return err
 	}
 
