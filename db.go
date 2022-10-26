@@ -28,7 +28,8 @@ var (
 	deleteStatements = &sync.Map{}
 
 	driverAlias = map[string]string{
-		"pgx": driverPostgres,
+		"pgx":    driverPostgres,
+		"sqlite": driverSqlite3,
 	}
 
 	// interface assert
