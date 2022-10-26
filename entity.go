@@ -38,8 +38,7 @@ var (
 	// WriteTimeout 写入entity数据的默认超时时间
 	WriteTimeout = 3 * time.Second
 
-	entities    = map[reflect.Type]*Metadata{}
-	entitiesMux sync.RWMutex
+	entities = &sync.Map{}
 
 	mapper = reflectx.NewMapper("db")
 )
@@ -116,22 +115,16 @@ func NewMetadata(ent Entity) (*Metadata, error) {
 func getMetadata(ent Entity) (*Metadata, error) {
 	t := reflectx.Deref(reflect.TypeOf(ent))
 
-	entitiesMux.RLock()
-	md, ok := entities[t]
-	entitiesMux.RUnlock()
-	if ok {
-		return md, nil
+	if v, ok := entities.Load(t); ok {
+		return v.(*Metadata), nil
 	}
-
-	entitiesMux.Lock()
-	defer entitiesMux.Unlock()
 
 	md, err := NewMetadata(ent)
 	if err != nil {
 		return nil, err
 	}
 
-	entities[t] = md
+	entities.Store(t, md)
 	return md, nil
 }
 

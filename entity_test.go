@@ -10,28 +10,46 @@ import (
 )
 
 func TestMetadata(t *testing.T) {
-	_, err := NewMetadata(&EmptyEntity{})
-	if err == nil {
-		t.Fatalf(`EmptyEntity metadata, Expected="empty empty", Actual=nil`)
-	}
+	t.Run("NewMetadata", func(t *testing.T) {
+		_, err := NewMetadata(&EmptyEntity{})
+		if err == nil {
+			t.Fatalf(`EmptyEntity metadata, Expected="empty empty", Actual=nil`)
+		}
 
-	_, err = NewMetadata(&NoPrimaryKeyEntity{})
-	if err == nil {
-		t.Fatalf(`NoPrimaryKeyEntity metadata, Expected="primary key undefined", Actual=nil`)
-	}
+		_, err = NewMetadata(&NoPrimaryKeyEntity{})
+		if err == nil {
+			t.Fatalf(`NoPrimaryKeyEntity metadata, Expected="primary key undefined", Actual=nil`)
+		}
 
-	md, err := NewMetadata(&GenernalEntity{})
-	if err != nil {
-		t.Fatalf(`GenernalEntity metadata, Expected=nil, Actual=%q`, err.Error())
-	}
+		md, err := NewMetadata(&GenernalEntity{})
+		if err != nil {
+			t.Fatalf(`GenernalEntity metadata, Expected=nil, Actual=%q`, err.Error())
+		}
 
-	if n := len(md.PrimaryKeys); n != 2 {
-		t.Fatalf(`GenernalEntity metadata primary key, Expected=2, Actual=%d`, n)
-	} else if n := len(md.Columns); n != 6 {
-		t.Fatalf(`GenernalEntity metadata columns, Expected=6, Actual=%d`, n)
-	} else if v := (&GenernalEntity{}).TableName(); md.TableName != v {
-		t.Fatalf(`GenernalEntity metadata tablename, Expected=%q, Actual=%q`, v, md.TableName)
-	}
+		if n := len(md.PrimaryKeys); n != 2 {
+			t.Fatalf(`GenernalEntity metadata primary key, Expected=2, Actual=%d`, n)
+		} else if n := len(md.Columns); n != 6 {
+			t.Fatalf(`GenernalEntity metadata columns, Expected=6, Actual=%d`, n)
+		} else if v := (&GenernalEntity{}).TableName(); md.TableName != v {
+			t.Fatalf(`GenernalEntity metadata tablename, Expected=%q, Actual=%q`, v, md.TableName)
+		}
+	})
+
+	t.Run("getMetadata", func(t *testing.T) {
+		md1, err := getMetadata(&GenernalEntity{})
+		if err != nil {
+			t.Fatalf("getMetadata(), %v", err)
+		}
+
+		md2, err := getMetadata(&GenernalEntity{})
+		if err != nil {
+			t.Fatalf("getMetadata(), %v", err)
+		}
+
+		if !reflect.DeepEqual(md1, md2) {
+			t.Fatal("different metadata")
+		}
+	})
 }
 
 func TestColumns(t *testing.T) {

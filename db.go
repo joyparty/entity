@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"reflect"
 	"strings"
 	"sync"
 
@@ -23,12 +22,10 @@ const (
 )
 
 var (
-	selectStatements = map[reflect.Type]string{}
-	insertStatements = map[reflect.Type]string{}
-	updateStatements = map[reflect.Type]string{}
-	deleteStatements = map[reflect.Type]string{}
-
-	statementsMux sync.RWMutex
+	selectStatements = &sync.Map{}
+	insertStatements = &sync.Map{}
+	updateStatements = &sync.Map{}
+	deleteStatements = &sync.Map{}
 
 	driverAlias = map[string]string{
 		"pgx": driverPostgres,
@@ -202,7 +199,7 @@ func doDelete(ctx context.Context, ent Entity, db DB) error {
 
 func getStatement(cmd string, md *Metadata, driver string) string {
 	var (
-		m  map[reflect.Type]string
+		m  *sync.Map
 		fn func(*Metadata, string) string
 	)
 
@@ -223,18 +220,12 @@ func getStatement(cmd string, md *Metadata, driver string) string {
 		panic(fmt.Errorf("unimplemented command %q", cmd))
 	}
 
-	statementsMux.RLock()
-	stmt, ok := m[md.Type]
-	statementsMux.RUnlock()
-	if ok {
-		return stmt
+	if v, ok := m.Load(md.Type); ok {
+		return v.(string)
 	}
 
-	statementsMux.Lock()
-	defer statementsMux.Unlock()
-
-	stmt = fn(md, driver)
-	m[md.Type] = stmt
+	stmt := fn(md, driver)
+	m.Store(md.Type, stmt)
 	return stmt
 }
 
