@@ -173,18 +173,8 @@ func doUpdate(ctx context.Context, ent Entity, db DB) error {
 		return rows.Err()
 	}
 
-	result, err := db.NamedExecContext(ctx, stmt, ent)
-	if err != nil {
-		return err
-	}
-
-	if n, err := result.RowsAffected(); err != nil {
-		return fmt.Errorf("get affected rows, %w", err)
-	} else if n == 0 {
-		return sql.ErrNoRows
-	}
-
-	return nil
+	_, err = db.NamedExecContext(ctx, stmt, ent)
+	return err
 }
 
 func doDelete(ctx context.Context, ent Entity, db DB) error {
