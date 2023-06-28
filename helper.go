@@ -117,6 +117,37 @@ func Transaction(db *sqlx.DB, fn func(tx *sqlx.Tx) error) (err error) {
 	return fn(tx)
 }
 
+// TryTransaction 尝试执行事务，如果DB不是*sqlx.DB，则直接执行fn
+func TryTransaction(db DB, fn func(DB) error) error {
+	if v, ok := db.(*sqlx.DB); ok {
+		return Transaction(v, func(tx *sqlx.Tx) error {
+			return fn(tx)
+		})
+	}
+	return fn(db)
+}
+
+// QueryBy 查询并使用回调函数处理游标
+func QueryBy(ctx context.Context, db DB, stmt *goqu.SelectDataset, fn func(ctx context.Context, rows *sqlx.Rows) error) error {
+	query, args, err := stmt.ToSQL()
+	if err != nil {
+		return fmt.Errorf("build sql, %w", err)
+	}
+
+	rows, err := db.QueryxContext(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("execute query, %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		if err := fn(ctx, rows); err != nil {
+			return fmt.Errorf("handle row, %w", err)
+		}
+	}
+	return nil
+}
+
 // Pagination 数据库分页计算
 type Pagination struct {
 	First    int `json:"first"`
