@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/joyparty/entity"
-	"github.com/pmylund/go-cache"
+	"github.com/patrickmn/go-cache"
 )
 
 type memoryCache struct {
