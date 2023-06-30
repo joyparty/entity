@@ -141,6 +141,12 @@ func QueryBy(ctx context.Context, db DB, stmt *goqu.SelectDataset, fn func(ctx c
 	defer rows.Close()
 
 	for rows.Next() {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		if err := fn(ctx, rows); err != nil {
 			return fmt.Errorf("handle row, %w", err)
 		}
