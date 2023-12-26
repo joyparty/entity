@@ -151,7 +151,7 @@ func QueryBy(ctx context.Context, db DB, stmt *goqu.SelectDataset, fn func(ctx c
 			return fmt.Errorf("handle row, %w", err)
 		}
 	}
-	return nil
+	return rows.Err()
 }
 
 // Pagination 数据库分页计算
