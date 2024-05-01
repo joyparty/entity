@@ -1,7 +1,6 @@
 package entity
 
 import (
-	"context"
 	"reflect"
 	"testing"
 	"time"
@@ -191,10 +190,6 @@ func (ge GenernalEntity) TableName() string {
 	return "genernal"
 }
 
-func (ge GenernalEntity) OnEntityEvent(ctx context.Context, ev Event) error {
-	return nil
-}
-
 type EmptyEntity struct {
 	ID   int    `db:"-"`
 	Name string `db:"-"`
@@ -204,10 +199,6 @@ func (ee EmptyEntity) TableName() string {
 	return "emtpy"
 }
 
-func (ee *EmptyEntity) OnEntityEvent(ctx context.Context, ev Event) error {
-	return nil
-}
-
 type NoPrimaryKeyEntity struct {
 	ID   int    `db:"int"`
 	Name string `db:"name"`
@@ -215,8 +206,4 @@ type NoPrimaryKeyEntity struct {
 
 func (npe NoPrimaryKeyEntity) TableName() string {
 	return "no_primary_key"
-}
-
-func (npe *NoPrimaryKeyEntity) OnEntityEvent(ctx context.Context, ev Event) error {
-	return nil
 }
