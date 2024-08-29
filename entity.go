@@ -3,6 +3,7 @@ package entity
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"reflect"
 	"sync"
@@ -31,7 +32,10 @@ const (
 
 var (
 	// ErrConflict 发生了数据冲突
-	ErrConflict = fmt.Errorf("database record conflict")
+	ErrConflict = errors.New("record conflict")
+
+	// ErrNotFound 记录未找到错误
+	ErrNotFound = errors.New("record not found")
 
 	// ReadTimeout 读取entity数据的默认超时时间
 	ReadTimeout = 3 * time.Second
