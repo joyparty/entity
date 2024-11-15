@@ -177,21 +177,22 @@ func getColumns(ent Entity) []Column { // revive:disable-line
 		}
 
 		for key := range fi.Options {
-			if key == "primaryKey" || key == "primary_key" {
+			switch key {
+			case "primaryKey", "primary_key":
 				col.PrimaryKey = true
 				col.RefuseUpdate = true
-			} else if key == "refuseUpdate" || key == "refuse_update" {
+			case "refuseUpdate", "refuse_update":
 				col.RefuseUpdate = true
-			} else if key == "returning" {
+			case "returning":
 				col.ReturningInsert = true
 				col.ReturningUpdate = true
 				col.RefuseUpdate = true
-			} else if key == "returningInsert" || key == "returning_insert" {
+			case "returningInsert", "returning_insert":
 				col.ReturningInsert = true
-			} else if key == "returningUpdate" || key == "returning_update" {
+			case "returningUpdate", "returning_update":
 				col.ReturningUpdate = true
 				col.RefuseUpdate = true
-			} else if key == "autoIncrement" || key == "auto_increment" {
+			case "autoIncrement", "auto_increment":
 				col.AutoIncrement = true
 				col.RefuseUpdate = true
 			}

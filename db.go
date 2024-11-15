@@ -72,11 +72,12 @@ func dbDriver(db DB) string {
 
 func isConflictError(err error, driver string) bool {
 	s := err.Error()
-	if driver == driverPostgres {
+	switch driver {
+	case driverPostgres:
 		return strings.Contains(s, "duplicate key value violates unique constraint")
-	} else if driver == driverMysql {
+	case driverMysql:
 		return strings.Contains(s, "Duplicate entry")
-	} else if driver == driverSqlite3 {
+	case driverSqlite3:
 		return strings.Contains(s, "UNIQUE constraint failed")
 	}
 	return false

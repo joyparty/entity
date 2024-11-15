@@ -6,7 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"time"
 )
 
@@ -60,7 +60,7 @@ func loadCache(ctx context.Context, ent Cacheable) (bool, error) {
 		}
 		defer zr.Close()
 
-		v, err := ioutil.ReadAll(zr)
+		v, err := io.ReadAll(zr)
 		if err != nil {
 			return false, fmt.Errorf("uncompress data, %w", err)
 		}
