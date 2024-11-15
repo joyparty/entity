@@ -26,6 +26,11 @@ func NewRepository[ID any, E Entity](db DB, factory Factory[ID, E]) *Repository[
 	}
 }
 
+// NewEntity 创建实体对象
+func (repo *Repository[ID, E]) NewEntity(id ID) E {
+	return repo.factory(id)
+}
+
 // Find 根据主键查询实体
 func (repo *Repository[ID, E]) Find(ctx context.Context, id ID) (E, error) {
 	ent := repo.factory(id)
