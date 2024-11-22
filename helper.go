@@ -3,6 +3,7 @@ package entity
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"math"
 
@@ -220,4 +221,14 @@ func (p Pagination) Offset() int {
 // UOffset 数据库查询OFFSET值
 func (p Pagination) UOffset() uint {
 	return uint(p.Offset())
+}
+
+// IsNotFound 判断是否是未找到错误
+//
+// repository在没有找到记录时返回ErrNotFound错误
+// GetRecord()在没有找到记录时返回sql.ErrNoRows错误
+// 使用这个方法来统一处理错误判断
+func IsNotFound(err error) bool {
+	return errors.Is(err, sql.ErrNoRows) ||
+		errors.Is(err, ErrNotFound)
 }
