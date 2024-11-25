@@ -229,6 +229,10 @@ func (p Pagination) UOffset() uint {
 // GetRecord()在没有找到记录时返回sql.ErrNoRows错误
 // 使用这个方法来统一处理错误判断
 func IsNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+
 	return errors.Is(err, sql.ErrNoRows) ||
 		errors.Is(err, ErrNotFound)
 }
