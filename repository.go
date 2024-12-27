@@ -10,16 +10,16 @@ import (
 )
 
 // Factory 实体工厂函数
-type Factory[ID any, E Entity] func(ID) E
+type Factory[ID comparable, E Entity] func(ID) E
 
 // Repository 实体仓库
-type Repository[ID any, E Entity] struct {
+type Repository[ID comparable, E Entity] struct {
 	db      DB
 	factory Factory[ID, E]
 }
 
 // NewRepository 创建实体仓库
-func NewRepository[ID any, E Entity](db DB, factory Factory[ID, E]) *Repository[ID, E] {
+func NewRepository[ID comparable, E Entity](db DB, factory Factory[ID, E]) *Repository[ID, E] {
 	return &Repository[ID, E]{
 		db:      db,
 		factory: factory,
