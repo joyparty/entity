@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"reflect"
 
 	"github.com/doug-martin/goqu/v9"
 )
@@ -85,8 +86,14 @@ func (repo *Repository[ID, E]) ForEach(ctx context.Context, stmt *goqu.SelectDat
 	}
 	defer rows.Close()
 
+	var v E
+	vt := reflect.TypeOf(v)
+	if vt.Kind() == reflect.Ptr {
+		vt = vt.Elem()
+	}
+
 	for rows.Next() {
-		var row E
+		row := reflect.New(vt).Interface().(E)
 
 		if err := rows.StructScan(row); err != nil {
 			return fmt.Errorf("scan row, %w", err)
