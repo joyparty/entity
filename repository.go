@@ -27,6 +27,11 @@ func NewRepository[ID comparable, E Entity](db DB, factory Factory[ID, E]) *Repo
 	}
 }
 
+// GetDB 获取数据库连接
+func (repo *Repository[ID, E]) GetDB() DB {
+	return repo.db
+}
+
 // NewEntity 创建实体对象
 func (repo *Repository[ID, E]) NewEntity(id ID) E {
 	return repo.factory(id)
@@ -120,6 +125,15 @@ func (repo *Repository[ID, E]) UpdateByQuery(ctx context.Context, stmt *goqu.Sel
 
 		return true, nil
 	})
+}
+
+// Query 通过查询条件获取实体列表
+func (repo *Repository[ID, E]) Query(ctx context.Context, stmt *goqu.SelectDataset) ([]E, error) {
+	var items []E
+	if err := GetRecords(ctx, &items, repo.db, stmt); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 // PageQuery 分页查询
