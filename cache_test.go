@@ -1,16 +1,15 @@
 package entity
 
 import (
+	"bytes"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 func TestRecursiveDecode(t *testing.T) {
 	type Case struct {
 		src      string
 		keys     []string
-		expected interface{}
+		expected []byte
 	}
 
 	cases := []Case{
@@ -22,20 +21,22 @@ func TestRecursiveDecode(t *testing.T) {
 		{
 			src:      `{"foo":"{\"bar\":1}"}`,
 			keys:     []string{"xxx"},
-			expected: ([]byte)(nil),
+			expected: nil,
 		},
 		{
 			src:      `{"foo":{"bar":1}}`,
 			keys:     []string{"foo"},
-			expected: ([]byte)(nil),
+			expected: nil,
 		},
 	}
 
 	for _, c := range cases {
 		data := []byte(c.src)
 		fixed, err := recursiveDecode(data, c.keys)
-
-		require.NoError(t, err)
-		require.Equal(t, c.expected, fixed)
+		if err != nil {
+			t.Fatal(err)
+		} else if !bytes.Equal(fixed, c.expected) {
+			t.Fatalf("expected %s, got %s", c.expected, fixed)
+		}
 	}
 }
