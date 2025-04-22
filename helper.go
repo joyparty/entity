@@ -98,7 +98,36 @@ func GetTotalCount(ctx context.Context, db DB, stmt *goqu.SelectDataset) (int, e
 
 // Transaction 执行事务过程，根据结果选择提交或回滚
 func Transaction(db *sqlx.DB, fn func(tx *sqlx.Tx) error) (err error) {
-	tx, err := db.Beginx()
+	return runTransaction(db, nil, fn)
+}
+
+// TransactionWithOptions 执行事务过程，根据结果选择提交或回滚
+func TransactionWithOptions(db *sqlx.DB, opt *sql.TxOptions, fn func(tx *sqlx.Tx) error) (err error) {
+	return runTransaction(db, opt, fn)
+}
+
+// TryTransaction 尝试执行事务，如果DB不是*sqlx.DB，则直接执行fn
+func TryTransaction(db DB, fn func(DB) error) error {
+	if v, ok := db.(*sqlx.DB); ok {
+		return Transaction(v, func(tx *sqlx.Tx) error {
+			return fn(tx)
+		})
+	}
+	return fn(db)
+}
+
+// TryTransactionWithOptions 尝试执行事务，如果DB不是*sqlx.DB，则直接执行fn
+func TryTransactionWithOptions(db DB, opt *sql.TxOptions, fn func(DB) error) error {
+	if v, ok := db.(*sqlx.DB); ok {
+		return TransactionWithOptions(v, opt, func(tx *sqlx.Tx) error {
+			return fn(tx)
+		})
+	}
+	return fn(db)
+}
+
+func runTransaction(db *sqlx.DB, opt *sql.TxOptions, fn func(tx *sqlx.Tx) error) (err error) {
+	tx, err := db.BeginTxx(context.Background(), opt)
 	if err != nil {
 		return fmt.Errorf("begin transaction, %w", err)
 	}
@@ -116,16 +145,6 @@ func Transaction(db *sqlx.DB, fn func(tx *sqlx.Tx) error) (err error) {
 	}()
 
 	return fn(tx)
-}
-
-// TryTransaction 尝试执行事务，如果DB不是*sqlx.DB，则直接执行fn
-func TryTransaction(db DB, fn func(DB) error) error {
-	if v, ok := db.(*sqlx.DB); ok {
-		return Transaction(v, func(tx *sqlx.Tx) error {
-			return fn(tx)
-		})
-	}
-	return fn(db)
 }
 
 // QueryBy 查询并使用回调函数处理游标
