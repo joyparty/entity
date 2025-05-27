@@ -134,8 +134,14 @@ func runTransaction(db *sqlx.DB, opt *sql.TxOptions, fn func(tx *sqlx.Tx) error)
 
 	defer func() {
 		if v := recover(); v != nil {
+			if vv, ok := v.(error); ok {
+				err = vv
+			} else {
+				err = fmt.Errorf("%v", v)
+			}
+
 			if errRollback := tx.Rollback(); errRollback != nil {
-				err = fmt.Errorf("rollback transaction, %v, caused by %v", errRollback, v)
+				err = fmt.Errorf("rollback transaction, %v, caused by %w", errRollback, err)
 			}
 			return
 		}
