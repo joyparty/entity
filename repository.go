@@ -11,7 +11,7 @@ import (
 )
 
 // Factory 实体工厂函数
-type Factory[ID comparable, E Entity] func(ID) E
+type Factory[ID comparable, E Entity] func(ID) (E, error)
 
 // Repository 实体仓库
 type Repository[ID comparable, E Entity] struct {
@@ -33,13 +33,17 @@ func (repo *Repository[ID, E]) GetDB() DB {
 }
 
 // NewEntity 创建实体对象
-func (repo *Repository[ID, E]) NewEntity(id ID) E {
+func (repo *Repository[ID, E]) NewEntity(id ID) (E, error) {
 	return repo.factory(id)
 }
 
 // Find 根据主键查询实体
 func (repo *Repository[ID, E]) Find(ctx context.Context, id ID) (E, error) {
-	ent := repo.factory(id)
+	ent, err := repo.factory(id)
+	if err != nil {
+		return ent, fmt.Errorf("new entity, %w", err)
+	}
+
 	if err := Load(ctx, ent, repo.db); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return ent, ErrNotFound
