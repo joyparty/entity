@@ -186,7 +186,7 @@ func doUpsert(ctx context.Context, ent Entity, db DB) error {
 		return fmt.Errorf("get metadata, %w", err)
 	}
 
-	for _, col := range md.Columns {
+	for _, col := range md.PrimaryKeys {
 		if col.AutoIncrement {
 			return fmt.Errorf("upsert not support auto increment primary key %q", col.DBField)
 		}
