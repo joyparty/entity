@@ -252,12 +252,13 @@ func getStatement(cmd string, md *Metadata, driver string) string {
 		panic(fmt.Errorf("unimplemented command %q", cmd))
 	}
 
-	if v, ok := m.Load(md.Type); ok {
+	key := fmt.Sprintf("%s.%s#%s", md.Type.PkgPath(), md.Type.String(), driver)
+	if v, ok := m.Load(key); ok {
 		return v.(string)
 	}
 
 	stmt := fn(md, driver)
-	m.Store(md.Type, stmt)
+	m.Store(key, stmt)
 	return stmt
 }
 
