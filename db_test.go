@@ -91,7 +91,7 @@ func TestStatement(t *testing.T) {
 	t.Run("getStatement", func(t *testing.T) {
 		md, _ := getMetadata(&GenernalEntity{})
 
-		for _, cmd := range []string{commandSelect, commandInsert, commandUpdate, commandDelete} {
+		for _, cmd := range []string{commandSelect, commandInsert, commandUpdate, commandDelete, commandUpsert} {
 			stmt1 := getStatement(cmd, md, driverPostgres)
 			stmt2 := getStatement(cmd, md, driverPostgres)
 
