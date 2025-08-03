@@ -55,6 +55,22 @@ func TestStatement(t *testing.T) {
 			}
 		})
 
+		t.Run("upsert", func(t *testing.T) {
+			md, _ := newTestMetadata(&GenernalEntity{})
+
+			stmt := newUpsertStatement(md, driverMysql)
+			expected := "INSERT INTO `genernal` (`extra`, `id2`, `name`) VALUES (:extra, :id2, :name) ON CONFLICT KEY UPDATE `extra` = :extra, `name` = :name RETURNING `create_at`, `version`"
+			if stmt != expected {
+				t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
+			}
+
+			stmt = newUpsertStatement(md, driverPostgres)
+			expected = `INSERT INTO "genernal" ("extra", "id2", "name") VALUES (:extra, :id2, :name) ON CONFLICT ("id", "id2") DO UPDATE SET "extra" = :extra, "name" = :name RETURNING "create_at", "version"`
+			if stmt != expected {
+				t.Fatalf("GenernalEntity, Expected=%s, Actual=%s", expected, stmt)
+			}
+		})
+
 		t.Run("delete", func(t *testing.T) {
 			md, _ := newTestMetadata(&GenernalEntity{})
 

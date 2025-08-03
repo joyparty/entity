@@ -14,6 +14,7 @@ const (
 	commandSelect = "select"
 	commandInsert = "insert"
 	commandUpdate = "update"
+	commandUpsert = "upsert"
 	commandDelete = "delete"
 
 	driverMysql    = "mysql"
@@ -25,6 +26,7 @@ var (
 	selectStatements = &sync.Map{}
 	insertStatements = &sync.Map{}
 	updateStatements = &sync.Map{}
+	upsertStatements = &sync.Map{}
 	deleteStatements = &sync.Map{}
 
 	driverAlias = map[string]string{
@@ -178,6 +180,35 @@ func doUpdate(ctx context.Context, ent Entity, db DB) error {
 	return err
 }
 
+func doUpsert(ctx context.Context, ent Entity, db DB) error {
+	md, err := getMetadata(ent)
+	if err != nil {
+		return fmt.Errorf("get metadata, %w", err)
+	}
+
+	stmt := getStatement(commandUpsert, md, dbDriver(db))
+	if !md.hasReturningInsert && !md.hasReturningUpdate {
+		_, err := db.NamedExecContext(ctx, stmt, ent)
+		return err
+	}
+
+	rows, err := sqlx.NamedQueryContext(ctx, db, stmt, ent)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return sql.ErrNoRows
+	}
+
+	if err := rows.StructScan(ent); err != nil {
+		return fmt.Errorf("scan struct, %w", err)
+	}
+
+	return rows.Err()
+}
+
 func doDelete(ctx context.Context, ent Entity, db DB) error {
 	md, err := getMetadata(ent)
 	if err != nil {
@@ -205,6 +236,9 @@ func getStatement(cmd string, md *Metadata, driver string) string {
 	case commandUpdate:
 		m = updateStatements
 		fn = newUpdateStatement
+	case commandUpsert:
+		m = upsertStatements
+		fn = newUpsertStatement
 	case commandDelete:
 		m = deleteStatements
 		fn = newDeleteStatement
@@ -297,6 +331,55 @@ func newUpdateStatement(md *Metadata, driver string) string {
 
 	if len(returnings) > 0 {
 		stmt += fmt.Sprintf(" RETURNING %s", strings.Join(returnings, ", "))
+	}
+
+	return stmt
+}
+
+func newUpsertStatement(md *Metadata, driver string) string {
+	insertColumns := []string{}
+	insertPlaceholders := []string{}
+	updateStmt := []string{}
+	returningColumns := []string{}
+
+	for _, v := range md.Columns {
+		column := quoteColumn(v.DBField, driver)
+		placeholder := fmt.Sprintf(":%s", v.DBField)
+
+		if !v.AutoIncrement && !v.ReturningInsert {
+			insertColumns = append(insertColumns, column)
+			insertPlaceholders = append(insertPlaceholders, placeholder)
+		}
+
+		if !v.PrimaryKey && !v.RefuseUpdate && !v.ReturningUpdate {
+			updateStmt = append(updateStmt, fmt.Sprintf("%s = %s", column, placeholder))
+		}
+
+		if v.ReturningInsert || v.ReturningUpdate {
+			returningColumns = append(returningColumns, column)
+		}
+	}
+
+	stmt := fmt.Sprintf(
+		"INSERT INTO %s (%s) VALUES (%s)",
+		quoteIdentifier(md.TableName, driver),
+		strings.Join(insertColumns, ", "),
+		strings.Join(insertPlaceholders, ", "),
+	)
+
+	if driver == driverMysql {
+		stmt += " ON CONFLICT KEY UPDATE " + strings.Join(updateStmt, ", ")
+	} else {
+		target := []string{}
+		for _, v := range md.PrimaryKeys {
+			target = append(target, quoteColumn(v.DBField, driver))
+		}
+
+		stmt += fmt.Sprintf(" ON CONFLICT (%s) DO UPDATE SET %s", strings.Join(target, ", "), strings.Join(updateStmt, ", "))
+	}
+
+	if len(returningColumns) > 0 {
+		stmt += fmt.Sprintf(" RETURNING %s", strings.Join(returningColumns, ", "))
 	}
 
 	return stmt

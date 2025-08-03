@@ -95,6 +95,11 @@ func (r *Repository[ID, R]) UpdateBy(ctx context.Context, id ID, apply func(row 
 	return nil
 }
 
+// Upsert 插入或更新实体
+func (r *Repository[ID, R]) Upsert(ctx context.Context, row R) error {
+	return Upsert(ctx, row, r.db)
+}
+
 // Delete 删除实体
 func (r *Repository[ID, R]) Delete(ctx context.Context, row R) error {
 	return Delete(ctx, row, r.db)
@@ -272,6 +277,16 @@ func (r *DomainObjectRepository[ID, DO, PO]) UpdateByQuery(ctx context.Context, 
 
 		return true, nil
 	})
+}
+
+// Upsert inserts or updates a domain object.
+func (r *DomainObjectRepository[ID, DO, PO]) Upsert(ctx context.Context, do DO) error {
+	po, err := r.NewPersistentObject(ctx, do)
+	if err != nil {
+		return fmt.Errorf("new persistent object, %w", err)
+	}
+
+	return r.poRepository.Upsert(ctx, po)
 }
 
 // Delete removes a domain object.

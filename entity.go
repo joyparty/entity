@@ -313,6 +313,36 @@ func Update(ctx context.Context, ent Entity, db DB) error {
 	return nil
 }
 
+// Upsert 插入或更新entity
+func Upsert(ctx context.Context, ent Entity, db DB) error {
+	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
+	defer cancel()
+
+	if err := beforeInsert(ctx, ent); err != nil {
+		return fmt.Errorf("before upsert, %w", err)
+	} else if err := beforeUpdate(ctx, ent); err != nil {
+		return fmt.Errorf("before upsert, %w", err)
+	}
+
+	if err := doUpsert(ctx, ent, db); err != nil {
+		return err
+	}
+
+	if v, ok := ent.(Cacheable); ok {
+		if err := DeleteCache(ctx, v); err != nil {
+			return fmt.Errorf("delete cache, %w", err)
+		}
+	}
+
+	if err := afterInsert(ctx, ent); err != nil {
+		return fmt.Errorf("after upsert, %w", err)
+	} else if err := afterUpdate(ctx, ent); err != nil {
+		return fmt.Errorf("after upsert, %w", err)
+	}
+
+	return nil
+}
+
 // Delete 删除entity
 func Delete(ctx context.Context, ent Entity, db DB) error {
 	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
