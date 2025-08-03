@@ -186,6 +186,12 @@ func doUpsert(ctx context.Context, ent Entity, db DB) error {
 		return fmt.Errorf("get metadata, %w", err)
 	}
 
+	for _, col := range md.Columns {
+		if col.AutoIncrement {
+			return fmt.Errorf("upsert not support auto increment primary key %q", col.DBField)
+		}
+	}
+
 	stmt := getStatement(commandUpsert, md, dbDriver(db))
 	if !md.hasReturningInsert && !md.hasReturningUpdate {
 		_, err := db.NamedExecContext(ctx, stmt, ent)
