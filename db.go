@@ -23,11 +23,7 @@ const (
 )
 
 var (
-	selectStatements = &sync.Map{}
-	insertStatements = &sync.Map{}
-	updateStatements = &sync.Map{}
-	upsertStatements = &sync.Map{}
-	deleteStatements = &sync.Map{}
+	statements = &sync.Map{}
 
 	driverAlias = map[string]string{
 		"pgx":    driverPostgres,
@@ -227,38 +223,30 @@ func doDelete(ctx context.Context, ent Entity, db DB) error {
 }
 
 func getStatement(cmd string, md *Metadata, driver string) string {
-	var (
-		m  *sync.Map
-		fn func(*Metadata, string) string
-	)
+	key := fmt.Sprintf("%s(%s.%s@%s)", cmd, md.Type.PkgPath(), md.Type.Name(), driver)
+	if v, ok := statements.Load(key); ok {
+		return v.(string)
+	}
+
+	var fn func(*Metadata, string) string
 
 	switch cmd {
 	case commandSelect:
-		m = selectStatements
 		fn = newSelectStatement
 	case commandInsert:
-		m = insertStatements
 		fn = newInsertStatement
 	case commandUpdate:
-		m = updateStatements
 		fn = newUpdateStatement
 	case commandUpsert:
-		m = upsertStatements
 		fn = newUpsertStatement
 	case commandDelete:
-		m = deleteStatements
 		fn = newDeleteStatement
 	default:
 		panic(fmt.Errorf("unimplemented command %q", cmd))
 	}
 
-	key := fmt.Sprintf("%s.%s#%s", md.Type.PkgPath(), md.Type.String(), driver)
-	if v, ok := m.Load(key); ok {
-		return v.(string)
-	}
-
 	stmt := fn(md, driver)
-	m.Store(key, stmt)
+	statements.Store(key, stmt)
 	return stmt
 }
 
