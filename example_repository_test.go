@@ -3,12 +3,19 @@ package entity_test
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/joyparty/entity"
+	"github.com/joyparty/entity/cache"
 )
+
+func init() {
+	// Initialize the default cacher for entity package.
+	entity.DefaultCacher = cache.NewMemoryCache()
+}
 
 // Account represents a user account.
 //
@@ -116,6 +123,16 @@ func (row *accountRow) BeforeInsert(_ context.Context) error {
 func (row *accountRow) BeforeUpdate(_ context.Context) error {
 	row.UpdatedAt = sql.NullTime{Time: time.Now(), Valid: true}
 	return nil
+}
+
+// CacheOption implements entity.Cacheable interface.
+//
+// It defines how the entity should be cached.
+func (row *accountRow) CacheOption() entity.CacheOption {
+	return entity.CacheOption{
+		Key:        fmt.Sprintf("account:%d", row.ID),
+		Expiration: 5 * time.Minute,
+	}
 }
 
 // SetID implements entity.Row interface.
