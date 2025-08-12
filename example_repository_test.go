@@ -70,6 +70,12 @@ func (r *accountRepository) Find(ctx context.Context, id int) (*Account, error) 
 	return r.base.Find(ctx, id)
 }
 
+func (r *accountRepository) FindByName(ctx context.Context, name string) (*Account, error) {
+	stmt := selectAccounts.Where(colName.Eq(name)).Limit(1)
+
+	return r.base.Get(ctx, stmt)
+}
+
 func (r *accountRepository) Create(ctx context.Context, a *Account) error {
 	return r.base.Create(ctx, a)
 }

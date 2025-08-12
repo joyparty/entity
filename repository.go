@@ -145,6 +145,21 @@ func (r *Repository[ID, R]) UpdateByQuery(ctx context.Context, stmt *goqu.Select
 	})
 }
 
+// Get 根据查询条件获取单个实体
+func (r *Repository[ID, R]) Get(ctx context.Context, stmt *goqu.SelectDataset) (R, error) {
+	row := reflect.New(r.rowType).Interface().(R)
+	if err := GetRecord(ctx, row, r.db, stmt); err != nil {
+		var x R
+		if errors.Is(err, sql.ErrNoRows) {
+			return x, ErrNotFound
+		}
+
+		return x, err
+	}
+
+	return row, nil
+}
+
 // Query 通过查询条件获取实体列表
 func (r *Repository[ID, R]) Query(ctx context.Context, stmt *goqu.SelectDataset) ([]R, error) {
 	var rows []R
@@ -316,6 +331,17 @@ func (r *DomainObjectRepository[ID, DO, PO]) ForEach(ctx context.Context, stmt *
 
 		return true, nil
 	})
+}
+
+// Get retrieves a domain object based on the provided query statement.
+func (r *DomainObjectRepository[ID, DO, PO]) Get(ctx context.Context, stmt *goqu.SelectDataset) (DO, error) {
+	po, err := r.poRepository.Get(ctx, stmt)
+	if err != nil {
+		var x DO
+		return x, err
+	}
+
+	return po.ToDomainObject()
 }
 
 // Query retrieves domain objects based on the provided query statement.
