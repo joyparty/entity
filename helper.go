@@ -187,6 +187,29 @@ func QueryBy(ctx context.Context, db DB, stmt *goqu.SelectDataset, fn func(ctx c
 	return rows.Err()
 }
 
+// NewUpsertRecord 构建upsert更新的记录
+//
+// 凡是refuse update的字段都不会被更新，如果需要更新其他字段，可以通过columns参数指定
+func NewUpsertRecord(ent Entity, columns ...string) goqu.Record {
+	md, err := getMetadata(ent)
+	if err != nil {
+		panic(fmt.Errorf("get metadata, %w", err))
+	}
+
+	record := goqu.Record{}
+	for _, col := range md.Columns {
+		if !col.RefuseUpdate {
+			record[col.DBField] = goqu.I(fmt.Sprintf("EXCLUDED.%s", col.DBField))
+		}
+	}
+
+	for _, col := range columns {
+		record[col] = goqu.I(fmt.Sprintf("EXCLUDED.%s", col))
+	}
+
+	return record
+}
+
 // Pagination 数据库分页计算
 type Pagination struct {
 	First    int `json:"first"`
