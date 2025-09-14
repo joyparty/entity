@@ -190,7 +190,7 @@ func QueryBy(ctx context.Context, db DB, stmt *goqu.SelectDataset, fn func(ctx c
 // NewUpsertRecord 构建upsert更新的记录
 //
 // 凡是refuse update的字段都不会被更新，如果需要更新其他字段，可以通过columns参数指定
-func NewUpsertRecord(ent Entity, columns ...string) goqu.Record {
+func NewUpsertRecord(ent Entity, otherColumns ...string) goqu.Record {
 	md, err := getMetadata(ent)
 	if err != nil {
 		panic(fmt.Errorf("get metadata, %w", err))
@@ -203,7 +203,7 @@ func NewUpsertRecord(ent Entity, columns ...string) goqu.Record {
 		}
 	}
 
-	for _, col := range columns {
+	for _, col := range otherColumns {
 		record[col] = goqu.I(fmt.Sprintf("EXCLUDED.%s", col))
 	}
 
