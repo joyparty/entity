@@ -97,36 +97,42 @@ func GetTotalCount(ctx context.Context, db DB, stmt *goqu.SelectDataset) (int, e
 }
 
 // Transaction 执行事务过程，根据结果选择提交或回滚
-func Transaction(db *sqlx.DB, fn func(tx *sqlx.Tx) error) (err error) {
+func Transaction[T Tx, U TxInitiator[T]](db U, fn func(db DB) error) (err error) {
 	return runTransaction(db, nil, fn)
 }
 
 // TransactionWithOptions 执行事务过程，根据结果选择提交或回滚
-func TransactionWithOptions(db *sqlx.DB, opt *sql.TxOptions, fn func(tx *sqlx.Tx) error) (err error) {
+func TransactionWithOptions[T Tx, U TxInitiator[T]](db U, opt *sql.TxOptions, fn func(db DB) error) (err error) {
 	return runTransaction(db, opt, fn)
 }
 
-// TryTransaction 尝试执行事务，如果DB不是*sqlx.DB，则直接执行fn
-func TryTransaction(db DB, fn func(DB) error) error {
-	if v, ok := db.(*sqlx.DB); ok {
-		return Transaction(v, func(tx *sqlx.Tx) error {
-			return fn(tx)
-		})
+// TryTransaction 尝试执行事务，如果DB是Tx类型，则直接执行fn，如果DB是TxInitiator类型，则开启事务执行fn
+//
+// 由于入参是DB接口，无法直接推导出具体的Tx类型，所以需要在调用时显式指定Tx类型参数
+//
+//	TryTransaction[*sqlx.Tx](db, func(db entity.DB) error
+func TryTransaction[T Tx](db DB, fn func(db DB) error) error {
+	if v, ok := db.(T); ok {
+		return fn(v)
+	} else if v, ok := db.(TxInitiator[T]); ok {
+		return Transaction(v, fn)
 	}
-	return fn(db)
+
+	return errors.New("db does not support transactions")
 }
 
 // TryTransactionWithOptions 尝试执行事务，如果DB不是*sqlx.DB，则直接执行fn
-func TryTransactionWithOptions(db DB, opt *sql.TxOptions, fn func(DB) error) error {
-	if v, ok := db.(*sqlx.DB); ok {
-		return TransactionWithOptions(v, opt, func(tx *sqlx.Tx) error {
-			return fn(tx)
-		})
+func TryTransactionWithOptions[T Tx](db DB, opt *sql.TxOptions, fn func(db DB) error) error {
+	if v, ok := db.(T); ok {
+		return fn(v)
+	} else if v, ok := db.(TxInitiator[T]); ok {
+		return TransactionWithOptions(v, opt, fn)
 	}
-	return fn(db)
+
+	return errors.New("db does not support transactions")
 }
 
-func runTransaction(db *sqlx.DB, opt *sql.TxOptions, fn func(tx *sqlx.Tx) error) (err error) {
+func runTransaction[T Tx, U TxInitiator[T]](db U, opt *sql.TxOptions, fn func(db DB) error) (err error) {
 	tx, err := db.BeginTxx(context.Background(), opt)
 	if err != nil {
 		return fmt.Errorf("begin transaction, %w", err)

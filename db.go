@@ -32,7 +32,9 @@ var (
 
 	// interface assert
 	_ DB = (*sqlx.DB)(nil)
-	_ DB = (*sqlx.Tx)(nil)
+	_ Tx = (*sqlx.Tx)(nil)
+
+	_ TxInitiator[*sqlx.Tx] = (*sqlx.DB)(nil)
 )
 
 // DB 数据库接口
@@ -58,6 +60,21 @@ type DB interface {
 	DriverName() string
 	Rebind(string) string
 	BindNamed(string, interface{}) (string, []interface{}, error)
+}
+
+// Tx 事务接口
+type Tx interface {
+	DB
+
+	Commit() error
+	Rollback() error
+}
+
+// TxInitiator 事务发起接口
+type TxInitiator[T Tx] interface {
+	DB
+
+	BeginTxx(ctx context.Context, opts *sql.TxOptions) (T, error)
 }
 
 func dbDriver(db DB) string {
