@@ -98,12 +98,22 @@ func GetTotalCount(ctx context.Context, db DB, stmt *goqu.SelectDataset) (int, e
 
 // Transaction 执行事务过程，根据结果选择提交或回滚
 func Transaction[T Tx, U TxInitiator[T]](db U, fn func(db DB) error) (err error) {
-	return runTransaction(db, nil, fn)
+	return TransactionX(context.Background(), db, fn)
+}
+
+// TransactionX 执行事务过程，根据结果选择提交或回滚
+func TransactionX[T Tx, U TxInitiator[T]](ctx context.Context, db U, fn func(db DB) error) (err error) {
+	return runTransaction(ctx, db, nil, fn)
 }
 
 // TransactionWithOptions 执行事务过程，根据结果选择提交或回滚
 func TransactionWithOptions[T Tx, U TxInitiator[T]](db U, opt *sql.TxOptions, fn func(db DB) error) (err error) {
-	return runTransaction(db, opt, fn)
+	return TransactionWithOptionsX(context.Background(), db, opt, fn)
+}
+
+// TransactionWithOptionsX 执行事务过程，根据结果选择提交或回滚
+func TransactionWithOptionsX[T Tx, U TxInitiator[T]](ctx context.Context, db U, opt *sql.TxOptions, fn func(db DB) error) (err error) {
+	return runTransaction(ctx, db, opt, fn)
 }
 
 // TryTransaction 尝试执行事务，如果DB是Tx类型，则直接执行fn，如果DB是TxInitiator类型，则开启事务执行fn
@@ -112,30 +122,52 @@ func TransactionWithOptions[T Tx, U TxInitiator[T]](db U, opt *sql.TxOptions, fn
 //
 //	TryTransaction[*sqlx.Tx](db, func(db entity.DB) error
 func TryTransaction[T Tx](db DB, fn func(db DB) error) error {
+	return TryTransactionX[T](context.Background(), db, fn)
+}
+
+// TryTransactionX 尝试执行事务，如果DB是Tx类型，则直接执行fn，如果DB是TxInitiator类型，则开启事务执行fn
+//
+// 由于入参是DB接口，无法直接推导出具体的Tx类型，所以需要在调用时显式指定Tx类型参数
+//
+// TryTransactionX[*sqlx.Tx](ctx, db, func(db entity.DB) error
+func TryTransactionX[T Tx](ctx context.Context, db DB, fn func(db DB) error) error {
 	if v, ok := db.(T); ok {
 		return fn(v)
 	} else if v, ok := db.(TxInitiator[T]); ok {
-		return Transaction(v, fn)
+		return TransactionX(ctx, v, fn)
 	}
 
 	var x T
 	return fmt.Errorf("db is neither %T nor TxInitiator[%T]", x, x)
 }
 
-// TryTransactionWithOptions 尝试执行事务，如果DB不是*sqlx.DB，则直接执行fn
+// TryTransactionWithOptions 尝试执行事务，如果DB不是*sqlx.DB，则直接执行fn，如果DB是TxInitiator类型，则开启事务执行fn
+//
+// 由于入参是DB接口，无法直接推导出具体的Tx类型，所以需要在调用时显式指定Tx类型参数
+//
+// TryTransactionWithOptions[*sqlx.Tx](db, opt, func(db entity.DB) error
 func TryTransactionWithOptions[T Tx](db DB, opt *sql.TxOptions, fn func(db DB) error) error {
+	return TryTransactionWithOptionsX[T](context.Background(), db, opt, fn)
+}
+
+// TryTransactionWithOptionsX 尝试执行事务，如果DB是Tx类型，则直接执行fn，如果DB是TxInitiator类型，则开启事务执行fn
+//
+// 由于入参是DB接口，无法直接推导出具体的Tx类型，所以需要在调用时显式指定Tx类型参数
+//
+// TryTransactionWithOptionsX[*sqlx.Tx](ctx, db, opt, func(db entity.DB) error
+func TryTransactionWithOptionsX[T Tx](ctx context.Context, db DB, opt *sql.TxOptions, fn func(db DB) error) error {
 	if v, ok := db.(T); ok {
 		return fn(v)
 	} else if v, ok := db.(TxInitiator[T]); ok {
-		return TransactionWithOptions(v, opt, fn)
+		return TransactionWithOptionsX(ctx, v, opt, fn)
 	}
 
 	var x T
 	return fmt.Errorf("db is neither %T nor TxInitiator[%T]", x, x)
 }
 
-func runTransaction[T Tx, U TxInitiator[T]](db U, opt *sql.TxOptions, fn func(db DB) error) (err error) {
-	tx, err := db.BeginTxx(context.Background(), opt)
+func runTransaction[T Tx, U TxInitiator[T]](ctx context.Context, db U, opt *sql.TxOptions, fn func(db DB) error) (err error) {
+	tx, err := db.BeginTxx(ctx, opt)
 	if err != nil {
 		return fmt.Errorf("begin transaction, %w", err)
 	}
