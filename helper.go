@@ -118,7 +118,8 @@ func TryTransaction[T Tx](db DB, fn func(db DB) error) error {
 		return Transaction(v, fn)
 	}
 
-	return errors.New("db does not support transactions")
+	var x T
+	return fmt.Errorf("db is neither %T nor TxInitiator[%T]", x, x)
 }
 
 // TryTransactionWithOptions 尝试执行事务，如果DB不是*sqlx.DB，则直接执行fn
@@ -129,7 +130,8 @@ func TryTransactionWithOptions[T Tx](db DB, opt *sql.TxOptions, fn func(db DB) e
 		return TransactionWithOptions(v, opt, fn)
 	}
 
-	return errors.New("db does not support transactions")
+	var x T
+	return fmt.Errorf("db is neither %T nor TxInitiator[%T]", x, x)
 }
 
 func runTransaction[T Tx, U TxInitiator[T]](db U, opt *sql.TxOptions, fn func(db DB) error) (err error) {
