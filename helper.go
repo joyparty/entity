@@ -97,6 +97,8 @@ func GetTotalCount(ctx context.Context, db DB, stmt *goqu.SelectDataset) (int, e
 }
 
 // Transaction 执行事务过程，根据结果选择提交或回滚
+//
+// Deprecated: Use TransactionX() instead.
 func Transaction[T Tx, U TxInitiator[T]](db U, fn func(db DB) error) (err error) {
 	return TransactionX(context.Background(), db, fn)
 }
@@ -107,6 +109,8 @@ func TransactionX[T Tx, U TxInitiator[T]](ctx context.Context, db U, fn func(db 
 }
 
 // TransactionWithOptions 执行事务过程，根据结果选择提交或回滚
+//
+// Deprecated: Use TransactionWithOptionsX() instead.
 func TransactionWithOptions[T Tx, U TxInitiator[T]](db U, opt *sql.TxOptions, fn func(db DB) error) (err error) {
 	return TransactionWithOptionsX(context.Background(), db, opt, fn)
 }
@@ -118,9 +122,7 @@ func TransactionWithOptionsX[T Tx, U TxInitiator[T]](ctx context.Context, db U, 
 
 // TryTransaction 尝试执行事务，如果DB是Tx类型，则直接执行fn，如果DB是TxInitiator类型，则开启事务执行fn
 //
-// 由于入参是DB接口，无法直接推导出具体的Tx类型，所以需要在调用时显式指定Tx类型参数
-//
-//	TryTransaction[*sqlx.Tx](db, func(db entity.DB) error
+// Deprecated: Use TryTransactionX() instead.
 func TryTransaction[T Tx](db DB, fn func(db DB) error) error {
 	return TryTransactionX[T](context.Background(), db, fn)
 }
@@ -143,9 +145,7 @@ func TryTransactionX[T Tx](ctx context.Context, db DB, fn func(db DB) error) err
 
 // TryTransactionWithOptions 尝试执行事务，如果DB不是*sqlx.DB，则直接执行fn，如果DB是TxInitiator类型，则开启事务执行fn
 //
-// 由于入参是DB接口，无法直接推导出具体的Tx类型，所以需要在调用时显式指定Tx类型参数
-//
-// TryTransactionWithOptions[*sqlx.Tx](db, opt, func(db entity.DB) error
+// Deprecated: Use TryTransactionWithOptionsX() instead.
 func TryTransactionWithOptions[T Tx](db DB, opt *sql.TxOptions, fn func(db DB) error) error {
 	return TryTransactionWithOptionsX[T](context.Background(), db, opt, fn)
 }
