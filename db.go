@@ -72,8 +72,6 @@ type Tx interface {
 
 // TxInitiator 事务发起接口
 type TxInitiator[T Tx] interface {
-	DB
-
 	BeginTxx(ctx context.Context, opts *sql.TxOptions) (T, error)
 }
 
