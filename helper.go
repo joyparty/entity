@@ -219,7 +219,7 @@ func SavePoint(ctx context.Context, tx Tx, name string, fn func() error) (err er
 	}
 
 	if _, err := tx.ExecContext(ctx, fmt.Sprintf("SAVEPOINT %s", name)); err != nil {
-		return fmt.Errorf("create savepoint, %w", err)
+		return fmt.Errorf("create savepoint %s, %w", name, err)
 	}
 
 	defer func() {
@@ -233,11 +233,13 @@ func SavePoint(ctx context.Context, tx Tx, name string, fn func() error) (err er
 
 		if err == nil {
 			if _, errRelease := tx.ExecContext(ctx, fmt.Sprintf("RELEASE SAVEPOINT %s", name)); errRelease != nil {
-				err = fmt.Errorf("release savepoint, %w", errRelease)
+				err = fmt.Errorf("release savepoint %s, %w", name, errRelease)
 			}
 		} else {
 			if _, errRollback := tx.ExecContext(ctx, fmt.Sprintf("ROLLBACK TO SAVEPOINT %s", name)); errRollback != nil {
-				err = fmt.Errorf("rollback to savepoint, %v, caused by %w", errRollback, err)
+				err = errors.Join(err,
+					fmt.Errorf("rollback to savepoint %s, %w", name, errRollback),
+				)
 			}
 		}
 	}()
