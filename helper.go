@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jmoiron/sqlx"
@@ -198,6 +199,50 @@ func runTransaction[T Tx, U TxInitiator[T]](ctx context.Context, db U, opt *sql.
 	}()
 
 	return fn(tx)
+}
+
+// TrySavePoint 尝试创建保存点，如果db不是Tx类型，则返回错误
+func TrySavePoint(ctx context.Context, db DB, name string, fn func() error) error {
+	if v, ok := db.(Tx); ok {
+		return SavePoint(ctx, v, name, fn)
+	}
+
+	return errors.New("is not in transaction")
+}
+
+var validSavePointName = regexp.MustCompile(`^[0-9a-zA-Z_]+$`)
+
+// SavePoint 在事务中创建保存点，并在fn执行成功后释放保存点，fn执行失败或panic时回滚到保存点
+func SavePoint(ctx context.Context, tx Tx, name string, fn func() error) (err error) {
+	if !validSavePointName.MatchString(name) {
+		return fmt.Errorf("invalid savepoint name: %s", name)
+	}
+
+	if _, err := tx.ExecContext(ctx, fmt.Sprintf("SAVEPOINT %s", name)); err != nil {
+		return fmt.Errorf("create savepoint, %w", err)
+	}
+
+	defer func() {
+		if v := recover(); v != nil {
+			if vv, ok := v.(error); ok {
+				err = vv
+			} else {
+				err = fmt.Errorf("%v", v)
+			}
+		}
+
+		if err == nil {
+			if _, errRelease := tx.ExecContext(ctx, fmt.Sprintf("RELEASE SAVEPOINT %s", name)); errRelease != nil {
+				err = fmt.Errorf("release savepoint, %w", errRelease)
+			}
+		} else {
+			if _, errRollback := tx.ExecContext(ctx, fmt.Sprintf("ROLLBACK TO SAVEPOINT %s", name)); errRollback != nil {
+				err = fmt.Errorf("rollback to savepoint, %v, caused by %w", errRollback, err)
+			}
+		}
+	}()
+
+	return fn()
 }
 
 // QueryBy 查询并使用回调函数处理游标
