@@ -206,28 +206,34 @@ func getColumns(ent Entity) []Column { // revive:disable-line
 // 从反射信息内，解析字段属性
 func getFields(node *reflectx.FieldInfo) []*reflectx.FieldInfo {
 	fields := []*reflectx.FieldInfo{}
-	for _, fi := range node.Children {
-		if fi == nil {
-			continue
-		}
 
-		if fi.Embedded {
-			fields = append(fields, getFields(fi)...)
-		} else {
-			fields = append(fields, fi)
+	var embedded []*reflectx.FieldInfo
+	for _, v := range node.Children {
+		if v != nil {
+			if v.Embedded {
+				embedded = append(embedded, v)
+			} else {
+				fields = append(fields, v)
+			}
 		}
+	}
+
+	for _, v := range embedded {
+		fields = append(fields, getFields(v)...)
 	}
 
 	// root node
 	if node.Parent == nil {
 		// replace duplicate name
-		filter := map[string]*reflectx.FieldInfo{}
+		m := map[string]*reflectx.FieldInfo{}
 		for _, v := range fields {
-			filter[v.Name] = v
+			if _, ok := m[v.Name]; !ok {
+				m[v.Name] = v
+			}
 		}
 
 		fields = fields[:0]
-		for _, v := range filter {
+		for _, v := range m {
 			fields = append(fields, v)
 		}
 	}

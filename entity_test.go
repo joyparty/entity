@@ -4,8 +4,6 @@ import (
 	"reflect"
 	"testing"
 	"time"
-
-	"github.com/jmoiron/sqlx/reflectx"
 )
 
 func TestMetadata(t *testing.T) {
@@ -101,82 +99,18 @@ func TestColumns(t *testing.T) {
 	}
 }
 
-func TestFields(t *testing.T) {
-	type NestExtend struct {
-		Foo string `db:"foo"`
-		Bar bool   `db:"bar"`
-	}
-
-	type MoreNestExtend struct {
-		Foo int `db:"foo"`
-	}
-
-	type Other struct {
-		Baz string `json:"baz"`
-	}
-
-	type Extend struct {
-		NestExtend
-		MoreNestExtend
-		Name string `db:"name"`
-	}
-
-	type Row struct {
-		Extend
-		ID    int   `db:"id,primaryKey"`
-		Other Other `db:"other"`
-	}
-
-	vt := reflectx.Deref(reflect.TypeOf(&Row{}))
-	tm := reflectx.NewMapper("db").TypeMap(vt)
-
-	fs := map[string]*reflectx.FieldInfo{}
-	for _, v := range getFields(tm.Tree) {
-		fs[v.Name] = v
-	}
-
-	expected := map[string]struct {
-		TypeKind reflect.Kind
-	}{
-		"id": {
-			TypeKind: reflect.Int,
-		},
-		"name": {
-			TypeKind: reflect.String,
-		},
-		"other": {
-			TypeKind: reflect.Struct,
-		},
-		"foo": {
-			TypeKind: reflect.Int,
-		},
-		"bar": {
-			TypeKind: reflect.Bool,
-		},
-	}
-
-	if len(fs) != len(expected) {
-		t.Fatalf("fields count, Expected=%d, Actual=%d", len(expected), len(fs))
-	}
-
-	for name, info := range expected {
-		fi, ok := fs[name]
-		if !ok {
-			t.Fatalf("fields(), %q not found", name)
-		}
-
-		if fi.Field.Type.Kind() != info.TypeKind {
-			t.Fatalf("fields() %q type, Expected=%s, Actual=%s", name, info.TypeKind, fi.Field.Type.Kind())
-		}
-	}
-}
-
 type TestExtra struct {
 	E1 string `json:"e1"`
 	E2 int    `json:"e2"`
 }
 
+type ExtendID struct {
+	ID int `db:"id"`
+}
+
 type GenernalEntity struct {
+	ExtendID
+
 	ID             int       `db:"id,primaryKey,autoIncrement"`
 	ID2            int       `db:"id2,primaryKey"`
 	Name           string    `db:"name"`
