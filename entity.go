@@ -144,7 +144,7 @@ func NewMetadata(ent Entity) (*Metadata, error) {
 	}
 
 	if len(md.PrimaryKeys) == 0 {
-		return nil, fmt.Errorf("undefined entity %q primary key", md.Type)
+		return nil, fmt.Errorf("entity %q primary key not found", md.Type)
 	}
 
 	return md, nil
@@ -166,11 +166,9 @@ func getMetadata(ent Entity) (*Metadata, error) {
 	return md, nil
 }
 
-func getColumns(ent Entity) []Column { // revive:disable-line
-	sm := mapper.TypeMap(reflectx.Deref(reflect.TypeOf(ent)))
-
+func getColumns(ent Entity) []Column {
 	cols := []Column{}
-	for _, fi := range getFields(sm.Tree) {
+	for _, fi := range getFields(ent) {
 		col := Column{
 			StructField: fi.Field.Name,
 			DBField:     fi.Name,
@@ -203,37 +201,39 @@ func getColumns(ent Entity) []Column { // revive:disable-line
 	return cols
 }
 
-// 从反射信息内，解析字段属性
-func getFields(node *reflectx.FieldInfo) []*reflectx.FieldInfo {
+// 获取实体对象所有的db字段，支持嵌套结构体，外层字段优先级高于内层字段
+func getFields(ent Entity) []*reflectx.FieldInfo {
+	var get func(node *reflectx.FieldInfo) []*reflectx.FieldInfo
+
+	get = func(node *reflectx.FieldInfo) []*reflectx.FieldInfo {
+		fields := []*reflectx.FieldInfo{}
+
+		var embedded []*reflectx.FieldInfo
+		for _, v := range node.Children {
+			if v != nil {
+				if v.Embedded {
+					embedded = append(embedded, v)
+				} else {
+					fields = append(fields, v)
+				}
+			}
+		}
+
+		for _, v := range embedded {
+			fields = append(fields, get(v)...)
+		}
+
+		return fields
+	}
+
+	sm := mapper.TypeMap(reflectx.Deref(reflect.TypeOf(ent)))
+
+	done := map[string]struct{}{}
 	fields := []*reflectx.FieldInfo{}
 
-	var embedded []*reflectx.FieldInfo
-	for _, v := range node.Children {
-		if v != nil {
-			if v.Embedded {
-				embedded = append(embedded, v)
-			} else {
-				fields = append(fields, v)
-			}
-		}
-	}
-
-	for _, v := range embedded {
-		fields = append(fields, getFields(v)...)
-	}
-
-	// root node
-	if node.Parent == nil {
-		// replace duplicate name
-		m := map[string]*reflectx.FieldInfo{}
-		for _, v := range fields {
-			if _, ok := m[v.Name]; !ok {
-				m[v.Name] = v
-			}
-		}
-
-		fields = fields[:0]
-		for _, v := range m {
+	for _, v := range get(sm.Tree) {
+		if _, ok := done[v.Name]; !ok {
+			done[v.Name] = struct{}{}
 			fields = append(fields, v)
 		}
 	}
