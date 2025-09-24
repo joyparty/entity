@@ -203,8 +203,9 @@ func getColumns(ent Entity) []Column {
 
 // 获取实体对象所有的db字段，支持嵌套结构体，外层字段优先级高于内层字段
 func getFields(ent Entity) []*reflectx.FieldInfo {
-	var get func(node *reflectx.FieldInfo) []*reflectx.FieldInfo
+	done := map[string]struct{}{}
 
+	var get func(node *reflectx.FieldInfo) []*reflectx.FieldInfo
 	get = func(node *reflectx.FieldInfo) []*reflectx.FieldInfo {
 		fields := []*reflectx.FieldInfo{}
 
@@ -214,7 +215,11 @@ func getFields(ent Entity) []*reflectx.FieldInfo {
 				if v.Embedded {
 					embedded = append(embedded, v)
 				} else {
-					fields = append(fields, v)
+					if _, ok := done[v.Name]; !ok {
+						done[v.Name] = struct{}{}
+
+						fields = append(fields, v)
+					}
 				}
 			}
 		}
@@ -226,19 +231,11 @@ func getFields(ent Entity) []*reflectx.FieldInfo {
 		return fields
 	}
 
-	sm := mapper.TypeMap(reflectx.Deref(reflect.TypeOf(ent)))
-
-	done := map[string]struct{}{}
-	fields := []*reflectx.FieldInfo{}
-
-	for _, v := range get(sm.Tree) {
-		if _, ok := done[v.Name]; !ok {
-			done[v.Name] = struct{}{}
-			fields = append(fields, v)
-		}
-	}
-
-	return fields
+	return get(
+		mapper.TypeMap(
+			reflectx.Deref(reflect.TypeOf(ent)),
+		).Tree,
+	)
 }
 
 // Load 从数据库载入entity
