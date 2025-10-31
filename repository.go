@@ -211,7 +211,7 @@ func NewDomainObjectRepository[ID comparable, DO any, PO PersistentObject[ID, DO
 ) *DomainObjectRepository[ID, DO, PO] {
 	var x PO
 	poType := reflect.TypeOf(x)
-	if poType.Kind() == reflect.Ptr {
+	if poType.Kind() == reflect.Pointer {
 		poType = poType.Elem()
 	}
 

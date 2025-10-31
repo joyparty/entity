@@ -1,3 +1,4 @@
+// Package entity is an ORM framework based on sqlx.
 package entity
 
 import (

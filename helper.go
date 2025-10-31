@@ -54,7 +54,7 @@ func ExecDelete(ctx context.Context, db DB, stmt *goqu.DeleteDataset) (sql.Resul
 }
 
 // GetRecord 执行查询语句，返回单条结果
-func GetRecord(ctx context.Context, dest interface{}, db DB, stmt *goqu.SelectDataset) error {
+func GetRecord(ctx context.Context, dest any, db DB, stmt *goqu.SelectDataset) error {
 	if !stmt.IsPrepared() {
 		stmt = stmt.Prepared(true)
 	}
@@ -67,7 +67,7 @@ func GetRecord(ctx context.Context, dest interface{}, db DB, stmt *goqu.SelectDa
 }
 
 // GetRecords 执行查询语句，返回多条结果
-func GetRecords(ctx context.Context, dest interface{}, db DB, stmt *goqu.SelectDataset) error {
+func GetRecords(ctx context.Context, dest any, db DB, stmt *goqu.SelectDataset) error {
 	if !stmt.IsPrepared() {
 		stmt = stmt.Prepared(true)
 	}

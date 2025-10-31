@@ -46,20 +46,20 @@ type DB interface {
 	sqlx.ExecerContext
 	sqlx.Preparer
 	sqlx.PreparerContext
-	Get(dest interface{}, query string, args ...interface{}) error
-	GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error
-	Select(dest interface{}, query string, args ...interface{}) error
-	SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error
-	NamedExec(query string, arg interface{}) (sql.Result, error)
-	NamedExecContext(ctx context.Context, query string, arg interface{}) (sql.Result, error)
-	NamedQuery(query string, arg interface{}) (*sqlx.Rows, error)
+	Get(dest any, query string, args ...any) error
+	GetContext(ctx context.Context, dest any, query string, args ...any) error
+	Select(dest any, query string, args ...any) error
+	SelectContext(ctx context.Context, dest any, query string, args ...any) error
+	NamedExec(query string, arg any) (sql.Result, error)
+	NamedExecContext(ctx context.Context, query string, arg any) (sql.Result, error)
+	NamedQuery(query string, arg any) (*sqlx.Rows, error)
 	PrepareNamed(query string) (*sqlx.NamedStmt, error)
 	PrepareNamedContext(ctx context.Context, query string) (*sqlx.NamedStmt, error)
 	Preparex(query string) (*sqlx.Stmt, error)
 	PreparexContext(ctx context.Context, query string) (*sqlx.Stmt, error)
 	DriverName() string
 	Rebind(string) string
-	BindNamed(string, interface{}) (string, []interface{}, error)
+	BindNamed(string, any) (string, []any, error)
 }
 
 // Tx 事务接口
