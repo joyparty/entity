@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"strings"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jmoiron/sqlx"
@@ -295,6 +296,25 @@ func NewUpsertRecord(ent Entity, otherColumns ...string) goqu.Record {
 	}
 
 	return record
+}
+
+// NewUpsertTarget build "INSERT ... ON CONFLICT target DO UPDATE" target string based on primary keys
+func NewUpsertTarget(ent Entity) string {
+	md, err := getMetadata(ent)
+	if err != nil {
+		panic(fmt.Errorf("get metadata, %w", err))
+	}
+
+	keys := md.PrimaryKeys
+	if len(keys) == 1 {
+		return keys[0].DBField
+	}
+
+	target := make([]string, 0, len(keys))
+	for _, key := range keys {
+		target = append(target, key.DBField)
+	}
+	return strings.Join(target, ", ")
 }
 
 // Pagination 数据库分页计算
