@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	// EventUnknown 未定义事件
+	// EventUnknown is an undefined event constant.
 	EventUnknown Event = iota
 	// EventBeforeInsert before insert entity
 	EventBeforeInsert
@@ -32,15 +32,15 @@ const (
 )
 
 var (
-	// ErrConflict 发生了数据冲突
+	// ErrConflict is returned when a data conflict is detected.
 	ErrConflict = errors.New("record conflict")
 
-	// ErrNotFound 记录未找到错误
+	// ErrNotFound is returned when a record is not found.
 	ErrNotFound = errors.New("record not found")
 
-	// ReadTimeout 读取entity数据的默认超时时间
+	// ReadTimeout is the default timeout for reading entity data.
 	ReadTimeout = 3 * time.Second
-	// WriteTimeout 写入entity数据的默认超时时间
+	// WriteTimeout is the default timeout for writing entity data.
 	WriteTimeout = 3 * time.Second
 
 	entities = &sync.Map{}
@@ -48,50 +48,50 @@ var (
 	mapper = reflectx.NewMapper("db")
 )
 
-// Event 存储事件
+// Event represents a storage event type.
 type Event int
 
-// Entity 实体对象接口
+// Entity is an interface that all entity objects must implement.
 type Entity interface {
 	TableName() string
 }
 
-// EventHook 事件风格钩子
+// EventHook is an interface for event-style hooks.
 type EventHook interface {
 	OnEntityEvent(ctx context.Context, ev Event) error
 }
 
-// BeforeInsertHook 在插入前调用
+// BeforeInsertHook is called before inserting an entity.
 type BeforeInsertHook interface {
 	BeforeInsert(ctx context.Context) error
 }
 
-// AfterInsertHook 在插入后调用
+// AfterInsertHook is called after inserting an entity.
 type AfterInsertHook interface {
 	AfterInsert(ctx context.Context) error
 }
 
-// BeforeUpdateHook 在更新前调用
+// BeforeUpdateHook is called before updating an entity.
 type BeforeUpdateHook interface {
 	BeforeUpdate(ctx context.Context) error
 }
 
-// AfterUpdateHook 在更新后调用
+// AfterUpdateHook is called after updating an entity.
 type AfterUpdateHook interface {
 	AfterUpdate(ctx context.Context) error
 }
 
-// BeforeDeleteHook 在删除前调用
+// BeforeDeleteHook is called before deleting an entity.
 type BeforeDeleteHook interface {
 	BeforeDelete(ctx context.Context) error
 }
 
-// AfterDeleteHook 在删除后调用
+// AfterDeleteHook is called after deleting an entity.
 type AfterDeleteHook interface {
 	AfterDelete(ctx context.Context) error
 }
 
-// Column 字段信息
+// Column contains field metadata information.
 type Column struct {
 	StructField     string
 	DBField         string
@@ -106,7 +106,7 @@ func (c Column) String() string {
 	return c.DBField
 }
 
-// Metadata 元数据
+// Metadata contains entity metadata such as table name, columns, and primary keys.
 type Metadata struct {
 	Type        reflect.Type
 	TableName   string
@@ -117,7 +117,7 @@ type Metadata struct {
 	hasReturningUpdate bool
 }
 
-// NewMetadata 构造实体对象元数据
+// NewMetadata constructs and returns the metadata for an entity object.
 func NewMetadata(ent Entity) (*Metadata, error) {
 	columns := getColumns(ent)
 
@@ -202,7 +202,7 @@ func getColumns(ent Entity) []Column {
 	return cols
 }
 
-// 获取实体对象所有的db字段，支持嵌套结构体，外层字段优先级高于内层字段
+// getFields returns all database fields of an entity object, supporting nested structs. Outer fields have higher priority than inner fields.
 func getFields(ent Entity) []*reflectx.FieldInfo {
 	done := map[string]struct{}{}
 
@@ -239,7 +239,7 @@ func getFields(ent Entity) []*reflectx.FieldInfo {
 	)
 }
 
-// Load 从数据库载入entity
+// Load retrieves an entity from the database.
 func Load(ctx context.Context, ent Entity, db DB) error {
 	ctx, cancel := context.WithTimeout(ctx, ReadTimeout)
 	defer cancel()
@@ -266,7 +266,7 @@ func Load(ctx context.Context, ent Entity, db DB) error {
 	return nil
 }
 
-// Insert 插入新entity
+// Insert saves a new entity to the database.
 func Insert(ctx context.Context, ent Entity, db DB) (int64, error) {
 	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
 	defer cancel()
@@ -289,7 +289,7 @@ func Insert(ctx context.Context, ent Entity, db DB) (int64, error) {
 	return lastID, nil
 }
 
-// Update 更新entity
+// Update updates an existing entity in the database.
 func Update(ctx context.Context, ent Entity, db DB) error {
 	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
 	defer cancel()
@@ -317,7 +317,7 @@ func Update(ctx context.Context, ent Entity, db DB) error {
 	return nil
 }
 
-// Upsert 插入或更新entity
+// Upsert inserts a new entity or updates an existing one in the database.
 func Upsert(ctx context.Context, ent Entity, db DB) error {
 	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
 	defer cancel()
@@ -347,7 +347,7 @@ func Upsert(ctx context.Context, ent Entity, db DB) error {
 	return nil
 }
 
-// Delete 删除entity
+// Delete removes an entity from the database.
 func Delete(ctx context.Context, ent Entity, db DB) error {
 	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
 	defer cancel()
@@ -372,14 +372,14 @@ func Delete(ctx context.Context, ent Entity, db DB) error {
 	return nil
 }
 
-// PrepareInsertStatement is a prepared insert statement for entity
+// PrepareInsertStatement is a prepared statement for inserting entities.
 type PrepareInsertStatement struct {
 	md       *Metadata
 	stmt     *sqlx.NamedStmt
 	dbDriver string
 }
 
-// PrepareInsert returns a prepared insert statement for Entity
+// PrepareInsert creates a prepared statement for inserting entities.
 func PrepareInsert(ctx context.Context, ent Entity, db DB) (*PrepareInsertStatement, error) {
 	md, err := getMetadata(ent)
 	if err != nil {
@@ -404,7 +404,7 @@ func (pis *PrepareInsertStatement) Close() error {
 	return pis.stmt.Close()
 }
 
-// ExecContext executes a prepared insert statement using the Entity passed.
+// ExecContext executes the prepared insert statement with the provided entity.
 func (pis *PrepareInsertStatement) ExecContext(ctx context.Context, ent Entity) (lastID int64, err error) {
 	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
 	defer cancel()
@@ -437,7 +437,7 @@ func (pis *PrepareInsertStatement) execContext(ctx context.Context, ent Entity) 
 	if err != nil {
 		return 0, err
 	} else if pis.dbDriver == driverPostgres {
-		// postgresql不支持LastInsertId特性
+		// PostgreSQL does not support the LastInsertId feature.
 		return 0, nil
 	}
 
@@ -448,14 +448,14 @@ func (pis *PrepareInsertStatement) execContext(ctx context.Context, ent Entity) 
 	return lastID, nil
 }
 
-// PrepareUpdateStatement is a prepared update statement for entity
+// PrepareUpdateStatement is a prepared statement for updating entities.
 type PrepareUpdateStatement struct {
 	md       *Metadata
 	stmt     *sqlx.NamedStmt
 	dbDriver string
 }
 
-// PrepareUpdate returns a prepared update statement for Entity
+// PrepareUpdate creates a prepared statement for updating entities.
 func PrepareUpdate(ctx context.Context, ent Entity, db DB) (*PrepareUpdateStatement, error) {
 	md, err := getMetadata(ent)
 	if err != nil {
@@ -481,7 +481,7 @@ func (pus *PrepareUpdateStatement) Close() error {
 	return pus.stmt.Close()
 }
 
-// ExecContext executes a prepared update statement using the Entity passed.
+// ExecContext executes the prepared update statement with the provided entity.
 func (pus *PrepareUpdateStatement) ExecContext(ctx context.Context, ent Entity) error {
 	ctx, cancel := context.WithTimeout(ctx, WriteTimeout)
 	defer cancel()

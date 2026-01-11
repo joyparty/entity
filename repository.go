@@ -10,21 +10,21 @@ import (
 	"github.com/doug-martin/goqu/v9"
 )
 
-// Row 实体行接口
+// Row is an entity row interface.
 type Row[ID comparable] interface {
 	Entity
 
 	SetID(ID) error
 }
 
-// Repository 实体仓库
+// Repository is a generic repository for entity objects.
 type Repository[ID comparable, R Row[ID]] struct {
 	db      DB
 	rowType reflect.Type
 	factory func(ID) (R, error)
 }
 
-// NewRepository 创建实体仓库
+// NewRepository creates a new Repository instance.
 func NewRepository[ID comparable, R Row[ID]](db DB) *Repository[ID, R] {
 	var row R
 	rt := reflect.TypeOf(row)
@@ -45,17 +45,17 @@ func NewRepository[ID comparable, R Row[ID]](db DB) *Repository[ID, R] {
 	}
 }
 
-// GetDB 获取数据库连接
+// GetDB returns the database connection used by the repository.
 func (r *Repository[ID, R]) GetDB() DB {
 	return r.db
 }
 
-// NewEntity 创建实体对象
+// NewEntity creates a new entity object with the given ID.
 func (r *Repository[ID, R]) NewEntity(id ID) (R, error) {
 	return r.factory(id)
 }
 
-// Find 根据主键查询实体
+// Find retrieves an entity by its primary key.
 func (r *Repository[ID, R]) Find(ctx context.Context, id ID) (R, error) {
 	row, err := r.factory(id)
 	if err != nil {
@@ -71,18 +71,18 @@ func (r *Repository[ID, R]) Find(ctx context.Context, id ID) (R, error) {
 	return row, nil
 }
 
-// Create 保存新的实体
+// Create saves a new entity to the database.
 func (r *Repository[ID, R]) Create(ctx context.Context, row R) error {
 	_, err := Insert(ctx, row, r.db)
 	return err
 }
 
-// Update 更新实体
+// Update updates an existing entity.
 func (r *Repository[ID, R]) Update(ctx context.Context, row R) error {
 	return Update(ctx, row, r.db)
 }
 
-// UpdateBy 根据ID查询实体并执行更新函数，apply return false则不保存
+// UpdateBy retrieves an entity by ID and executes the apply function to update it. If apply returns false, changes are not saved.
 func (r *Repository[ID, R]) UpdateBy(ctx context.Context, id ID, apply func(row R) (bool, error)) error {
 	row, err := r.Find(ctx, id)
 	if err != nil {
@@ -95,17 +95,17 @@ func (r *Repository[ID, R]) UpdateBy(ctx context.Context, id ID, apply func(row 
 	return nil
 }
 
-// Upsert 插入或更新实体
+// Upsert inserts a new entity or updates an existing one.
 func (r *Repository[ID, R]) Upsert(ctx context.Context, row R) error {
 	return Upsert(ctx, row, r.db)
 }
 
-// Delete 删除实体
+// Delete removes an entity from the database.
 func (r *Repository[ID, R]) Delete(ctx context.Context, row R) error {
 	return Delete(ctx, row, r.db)
 }
 
-// ForEach 根据查询遍历实体，iteratee return false则停止遍历
+// ForEach iterates over entities matching the query statement. The iteratee function should return false to stop iteration.
 func (r *Repository[ID, R]) ForEach(ctx context.Context, stmt *goqu.SelectDataset, iteratee func(row R) (bool, error)) error {
 	query, args, err := stmt.ToSQL()
 	if err != nil {
@@ -133,7 +133,7 @@ func (r *Repository[ID, R]) ForEach(ctx context.Context, stmt *goqu.SelectDatase
 	return rows.Err()
 }
 
-// UpdateByQuery 查询并更新，apply return false则放弃那一条的更新
+// UpdateByQuery queries for entities and updates them using the apply function. If apply returns false for a row, that update is skipped.
 func (r *Repository[ID, R]) UpdateByQuery(ctx context.Context, stmt *goqu.SelectDataset, apply func(row R) (bool, error)) error {
 	return r.ForEach(ctx, stmt, func(row R) (bool, error) {
 		if ok, err := apply(row); err != nil || !ok {
@@ -145,7 +145,7 @@ func (r *Repository[ID, R]) UpdateByQuery(ctx context.Context, stmt *goqu.Select
 	})
 }
 
-// Get 根据查询条件获取单个实体
+// Get retrieves a single entity matching the query statement.
 func (r *Repository[ID, R]) Get(ctx context.Context, stmt *goqu.SelectDataset) (R, error) {
 	row := reflect.New(r.rowType).Interface().(R)
 	if err := GetRecord(ctx, row, r.db, stmt); err != nil {
@@ -160,7 +160,7 @@ func (r *Repository[ID, R]) Get(ctx context.Context, stmt *goqu.SelectDataset) (
 	return row, nil
 }
 
-// Query 通过查询条件获取实体列表
+// Query retrieves a list of entities matching the query statement.
 func (r *Repository[ID, R]) Query(ctx context.Context, stmt *goqu.SelectDataset) ([]R, error) {
 	var rows []R
 	if err := GetRecords(ctx, &rows, r.db, stmt); err != nil {
@@ -169,7 +169,7 @@ func (r *Repository[ID, R]) Query(ctx context.Context, stmt *goqu.SelectDataset)
 	return rows, nil
 }
 
-// PageQuery 分页查询
+// PageQuery retrieves a paginated list of entities matching the query statement.
 func (r *Repository[ID, R]) PageQuery(ctx context.Context, stmt *goqu.SelectDataset, currentPage, pageSize int) (rows []R, page Pagination, err error) {
 	total, err := GetTotalCount(ctx, r.db, stmt)
 	if err != nil {
@@ -187,7 +187,7 @@ func (r *Repository[ID, R]) PageQuery(ctx context.Context, stmt *goqu.SelectData
 	return
 }
 
-// PersistentObject 持久化对象接口
+// PersistentObject is an interface for domain objects that can be persisted to the database.
 type PersistentObject[ID comparable, DO any] interface {
 	Row[ID]
 
@@ -198,8 +198,9 @@ type PersistentObject[ID comparable, DO any] interface {
 
 // DomainObjectRepository is a repository for domain objects.
 //
-// 有些方法的入参使用了*goqu.SelectDataset，违背了DDD的基础设施层不应该暴露技术细节的原则，
-// 因此DomainObjectRepository不应该作为最终的实现，应该作为最终实现的组件使用
+// Note: Some methods accept *goqu.SelectDataset parameters, which exposes technical implementation details
+// and violates DDD principles. Therefore, DomainObjectRepository should not be used as a final implementation
+// but rather as a component of the final implementation.
 type DomainObjectRepository[ID comparable, DO any, PO PersistentObject[ID, DO]] struct {
 	poRepository *Repository[ID, PO]
 	poType       reflect.Type
@@ -221,7 +222,7 @@ func NewDomainObjectRepository[ID comparable, DO any, PO PersistentObject[ID, DO
 	}
 }
 
-// Find use id to find a domain object.
+// Find retrieves a domain object by ID.
 func (r *DomainObjectRepository[ID, DO, PO]) Find(ctx context.Context, id ID) (DO, error) {
 	po, err := r.poRepository.Find(ctx, id)
 	if err != nil {
@@ -232,7 +233,7 @@ func (r *DomainObjectRepository[ID, DO, PO]) Find(ctx context.Context, id ID) (D
 	return po.ToDomainObject()
 }
 
-// Create saves a new domain object.
+// Create saves a new domain object to the database.
 func (r *DomainObjectRepository[ID, DO, PO]) Create(ctx context.Context, do DO) error {
 	po, err := r.NewPersistentObject(ctx, do)
 	if err != nil {
@@ -242,7 +243,7 @@ func (r *DomainObjectRepository[ID, DO, PO]) Create(ctx context.Context, do DO) 
 	return r.poRepository.Create(ctx, po)
 }
 
-// Update updates a domain object.
+// Update updates an existing domain object in the database.
 func (r *DomainObjectRepository[ID, DO, PO]) Update(ctx context.Context, do DO) error {
 	po, err := r.NewPersistentObject(ctx, do)
 	if err != nil {
@@ -252,7 +253,7 @@ func (r *DomainObjectRepository[ID, DO, PO]) Update(ctx context.Context, do DO) 
 	return r.poRepository.Update(ctx, po)
 }
 
-// UpdateBy updates a domain object by id using the apply function.
+// UpdateBy retrieves a domain object by ID and updates it using the apply function.
 func (r *DomainObjectRepository[ID, DO, PO]) UpdateBy(ctx context.Context, id ID, apply func(do DO) (bool, error)) error {
 	return r.poRepository.UpdateBy(ctx, id, func(po PO) (ok bool, err error) {
 		defer func() {
@@ -273,7 +274,7 @@ func (r *DomainObjectRepository[ID, DO, PO]) UpdateBy(ctx context.Context, id ID
 	})
 }
 
-// UpdateByQuery updates domain objects by a query statement using the apply function.
+// UpdateByQuery queries for domain objects and updates them using the apply function.
 func (r *DomainObjectRepository[ID, DO, PO]) UpdateByQuery(ctx context.Context, stmt *goqu.SelectDataset, apply func(do DO) (bool, error)) error {
 	return r.poRepository.UpdateByQuery(ctx, stmt, func(po PO) (ok bool, err error) {
 		defer func() {
@@ -294,7 +295,7 @@ func (r *DomainObjectRepository[ID, DO, PO]) UpdateByQuery(ctx context.Context, 
 	})
 }
 
-// Upsert inserts or updates a domain object.
+// Upsert inserts a new domain object or updates an existing one.
 func (r *DomainObjectRepository[ID, DO, PO]) Upsert(ctx context.Context, do DO) error {
 	po, err := r.NewPersistentObject(ctx, do)
 	if err != nil {
@@ -304,7 +305,7 @@ func (r *DomainObjectRepository[ID, DO, PO]) Upsert(ctx context.Context, do DO) 
 	return r.poRepository.Upsert(ctx, po)
 }
 
-// Delete removes a domain object.
+// Delete removes a domain object from the database.
 func (r *DomainObjectRepository[ID, DO, PO]) Delete(ctx context.Context, do DO) error {
 	po, err := r.NewPersistentObject(ctx, do)
 	if err != nil {
@@ -314,7 +315,7 @@ func (r *DomainObjectRepository[ID, DO, PO]) Delete(ctx context.Context, do DO) 
 	return r.poRepository.Delete(ctx, po)
 }
 
-// ForEach iterates over domain objects based on the provided query statement.
+// ForEach iterates over domain objects matching the query. The iteratee function should return false to stop iteration.
 func (r *DomainObjectRepository[ID, DO, PO]) ForEach(ctx context.Context, stmt *goqu.SelectDataset, iteratee func(do DO) (bool, error)) error {
 	return r.poRepository.ForEach(ctx, stmt, func(po PO) (ok bool, err error) {
 		defer func() {
@@ -333,7 +334,7 @@ func (r *DomainObjectRepository[ID, DO, PO]) ForEach(ctx context.Context, stmt *
 	})
 }
 
-// Get retrieves a domain object based on the provided query statement.
+// Get retrieves a single domain object matching the query statement.
 func (r *DomainObjectRepository[ID, DO, PO]) Get(ctx context.Context, stmt *goqu.SelectDataset) (DO, error) {
 	po, err := r.poRepository.Get(ctx, stmt)
 	if err != nil {
@@ -344,7 +345,7 @@ func (r *DomainObjectRepository[ID, DO, PO]) Get(ctx context.Context, stmt *goqu
 	return po.ToDomainObject()
 }
 
-// Query retrieves domain objects based on the provided query statement.
+// Query retrieves a list of domain objects matching the query statement.
 func (r *DomainObjectRepository[ID, DO, PO]) Query(ctx context.Context, stmt *goqu.SelectDataset) ([]DO, error) {
 	rows, err := r.poRepository.Query(ctx, stmt)
 	if err != nil {
@@ -354,7 +355,7 @@ func (r *DomainObjectRepository[ID, DO, PO]) Query(ctx context.Context, stmt *go
 	return r.ToDomainObjects(rows)
 }
 
-// PageQuery retrieves a paginated list of domain objects based on the provided query statement.
+// PageQuery retrieves a paginated list of domain objects matching the query statement.
 func (r *DomainObjectRepository[ID, DO, PO]) PageQuery(ctx context.Context, stmt *goqu.SelectDataset, currentPage, pageSize int) ([]DO, Pagination, error) {
 	rows, page, err := r.poRepository.PageQuery(ctx, stmt, currentPage, pageSize)
 	if err != nil {
@@ -369,7 +370,7 @@ func (r *DomainObjectRepository[ID, DO, PO]) PageQuery(ctx context.Context, stmt
 	return items, page, nil
 }
 
-// ToDomainObjects converts persistent objects to domain objects.
+// ToDomainObjects converts a slice of persistent objects to domain objects.
 func (r *DomainObjectRepository[ID, DO, PO]) ToDomainObjects(src []PO) ([]DO, error) {
 	result := make([]DO, 0, len(src))
 	for _, po := range src {

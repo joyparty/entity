@@ -37,8 +37,7 @@ var (
 	_ TxInitiator[*sqlx.Tx] = (*sqlx.DB)(nil)
 )
 
-// DB 数据库接口
-// sqlx.DB 和 sqlx.Tx 公共方法
+// DB is the database interface that provides common methods for sqlx.DB and sqlx.Tx.
 type DB interface {
 	sqlx.Queryer
 	sqlx.QueryerContext
@@ -62,7 +61,7 @@ type DB interface {
 	BindNamed(string, any) (string, []any, error)
 }
 
-// Tx 事务接口
+// Tx is a database transaction interface.
 type Tx interface {
 	DB
 
@@ -70,7 +69,7 @@ type Tx interface {
 	Rollback() error
 }
 
-// TxInitiator 事务发起接口
+// TxInitiator is an interface for initiating database transactions.
 type TxInitiator[T Tx] interface {
 	BeginTxx(ctx context.Context, opts *sql.TxOptions) (T, error)
 }
@@ -150,7 +149,7 @@ func doInsert(ctx context.Context, ent Entity, db DB) (int64, error) {
 		return 0, err
 	}
 
-	// postgresql不支持LastInsertId特性
+	// PostgreSQL does not support the LastInsertId feature.
 	if dbDriver(db) == driverPostgres {
 		return 0, nil
 	}

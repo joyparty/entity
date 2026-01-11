@@ -13,9 +13,9 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// 封装了一些goqu的快捷调用
+// Package entity provides convenient wrapper functions for goqu query builder.
 
-// ExecInsert 执行插入语句
+// ExecInsert executes an insert statement.
 func ExecInsert(ctx context.Context, db DB, stmt *goqu.InsertDataset) (sql.Result, error) {
 	if !stmt.IsPrepared() {
 		stmt = stmt.Prepared(true)
@@ -28,7 +28,7 @@ func ExecInsert(ctx context.Context, db DB, stmt *goqu.InsertDataset) (sql.Resul
 	return db.ExecContext(ctx, query, args...)
 }
 
-// ExecUpdate 执行更新语句
+// ExecUpdate executes an update statement.
 func ExecUpdate(ctx context.Context, db DB, stmt *goqu.UpdateDataset) (sql.Result, error) {
 	if !stmt.IsPrepared() {
 		stmt = stmt.Prepared(true)
@@ -41,7 +41,7 @@ func ExecUpdate(ctx context.Context, db DB, stmt *goqu.UpdateDataset) (sql.Resul
 	return db.ExecContext(ctx, query, args...)
 }
 
-// ExecDelete 执行删除语句
+// ExecDelete executes a delete statement.
 func ExecDelete(ctx context.Context, db DB, stmt *goqu.DeleteDataset) (sql.Result, error) {
 	if !stmt.IsPrepared() {
 		stmt = stmt.Prepared(true)
@@ -54,7 +54,7 @@ func ExecDelete(ctx context.Context, db DB, stmt *goqu.DeleteDataset) (sql.Resul
 	return db.ExecContext(ctx, query, args...)
 }
 
-// GetRecord 执行查询语句，返回单条结果
+// GetRecord executes a select query and returns a single result.
 func GetRecord(ctx context.Context, dest any, db DB, stmt *goqu.SelectDataset) error {
 	if !stmt.IsPrepared() {
 		stmt = stmt.Prepared(true)
@@ -67,7 +67,7 @@ func GetRecord(ctx context.Context, dest any, db DB, stmt *goqu.SelectDataset) e
 	return db.GetContext(ctx, dest, query, args...)
 }
 
-// GetRecords 执行查询语句，返回多条结果
+// GetRecords executes a select query and returns multiple results.
 func GetRecords(ctx context.Context, dest any, db DB, stmt *goqu.SelectDataset) error {
 	if !stmt.IsPrepared() {
 		stmt = stmt.Prepared(true)
@@ -80,7 +80,7 @@ func GetRecords(ctx context.Context, dest any, db DB, stmt *goqu.SelectDataset) 
 	return db.SelectContext(ctx, dest, query, args...)
 }
 
-// GetTotalCount 符合条件的总记录数量
+// GetTotalCount returns the total number of records matching the query conditions.
 func GetTotalCount(ctx context.Context, db DB, stmt *goqu.SelectDataset) (int, error) {
 	stmt = stmt.Select(goqu.L(`count(1)`))
 	clauses := stmt.GetClauses()
@@ -98,42 +98,43 @@ func GetTotalCount(ctx context.Context, db DB, stmt *goqu.SelectDataset) (int, e
 	return total, nil
 }
 
-// Transaction 执行事务过程，根据结果选择提交或回滚
+// Transaction executes a function within a database transaction, committing on success or rolling back on error.
 //
-// Deprecated: Use TransactionX() instead.
+// Deprecated: Use TransactionX instead.
 func Transaction[T Tx, U TxInitiator[T]](db U, fn func(db DB) error) (err error) {
 	return TransactionX(context.Background(), db, fn)
 }
 
-// TransactionX 执行事务过程，根据结果选择提交或回滚
+// TransactionX executes a function within a database transaction with context support.
 func TransactionX[T Tx, U TxInitiator[T]](ctx context.Context, db U, fn func(db DB) error) (err error) {
 	return runTransaction(ctx, db, nil, fn)
 }
 
-// TransactionWithOptions 执行事务过程，根据结果选择提交或回滚
+// TransactionWithOptions executes a function within a database transaction with custom options.
 //
-// Deprecated: Use TransactionWithOptionsX() instead.
+// Deprecated: Use TransactionWithOptionsX instead.
 func TransactionWithOptions[T Tx, U TxInitiator[T]](db U, opt *sql.TxOptions, fn func(db DB) error) (err error) {
 	return TransactionWithOptionsX(context.Background(), db, opt, fn)
 }
 
-// TransactionWithOptionsX 执行事务过程，根据结果选择提交或回滚
+// TransactionWithOptionsX executes a function within a database transaction with context and custom options.
 func TransactionWithOptionsX[T Tx, U TxInitiator[T]](ctx context.Context, db U, opt *sql.TxOptions, fn func(db DB) error) (err error) {
 	return runTransaction(ctx, db, opt, fn)
 }
 
-// TryTransaction 尝试执行事务，如果DB是Tx类型，则直接执行fn，如果DB是TxInitiator类型，则开启事务执行fn
+// TryTransaction attempts to execute a function within a transaction. If the database is already a transaction, the function is executed directly. If it's a transaction initiator, a transaction is started.
 //
-// Deprecated: Use TryTransactionX() instead.
+// Deprecated: Use TryTransactionX instead.
 func TryTransaction[T Tx](db DB, fn func(db DB) error) error {
 	return TryTransactionX[T](context.Background(), db, fn)
 }
 
-// TryTransactionX 尝试执行事务，如果DB是Tx类型，则直接执行fn，如果DB是TxInitiator类型，则开启事务执行fn
+// TryTransactionX attempts to execute a function within a transaction with context support.
+// If the database is already a transaction, the function is executed directly.
+// If it's a transaction initiator, a transaction is started.
+// The specific Tx type must be explicitly specified as it cannot be derived from the DB interface.
 //
-// 由于入参是DB接口，无法直接推导出具体的Tx类型，所以需要在调用时显式指定Tx类型参数
-//
-// TryTransactionX[*sqlx.Tx](ctx, db, func(db entity.DB) error
+// Example: TryTransactionX[*sqlx.Tx](ctx, db, func(db entity.DB) error { ... })
 func TryTransactionX[T Tx](ctx context.Context, db DB, fn func(db DB) error) error {
 	if v, ok := db.(T); ok {
 		return fn(v)
@@ -145,18 +146,19 @@ func TryTransactionX[T Tx](ctx context.Context, db DB, fn func(db DB) error) err
 	return fmt.Errorf("db is neither %T nor TxInitiator[%T]", x, x)
 }
 
-// TryTransactionWithOptions 尝试执行事务，如果DB不是*sqlx.DB，则直接执行fn，如果DB是TxInitiator类型，则开启事务执行fn
+// TryTransactionWithOptions attempts to execute a function within a transaction with custom options.
 //
-// Deprecated: Use TryTransactionWithOptionsX() instead.
+// Deprecated: Use TryTransactionWithOptionsX instead.
 func TryTransactionWithOptions[T Tx](db DB, opt *sql.TxOptions, fn func(db DB) error) error {
 	return TryTransactionWithOptionsX[T](context.Background(), db, opt, fn)
 }
 
-// TryTransactionWithOptionsX 尝试执行事务，如果DB是Tx类型，则直接执行fn，如果DB是TxInitiator类型，则开启事务执行fn
+// TryTransactionWithOptionsX attempts to execute a function within a transaction with context and custom options.
+// If the database is already a transaction, the function is executed directly.
+// If it's a transaction initiator, a transaction is started.
+// The specific Tx type must be explicitly specified as it cannot be derived from the DB interface.
 //
-// 由于入参是DB接口，无法直接推导出具体的Tx类型，所以需要在调用时显式指定Tx类型参数
-//
-// TryTransactionWithOptionsX[*sqlx.Tx](ctx, db, opt, func(db entity.DB) error
+// Example: TryTransactionWithOptionsX[*sqlx.Tx](ctx, db, opt, func(db entity.DB) error { ... })
 func TryTransactionWithOptionsX[T Tx](ctx context.Context, db DB, opt *sql.TxOptions, fn func(db DB) error) error {
 	if v, ok := db.(T); ok {
 		return fn(v)
@@ -202,7 +204,7 @@ func runTransaction[T Tx, U TxInitiator[T]](ctx context.Context, db U, opt *sql.
 	return fn(tx)
 }
 
-// TrySavePoint 尝试创建保存点，如果db不是Tx类型，则返回错误
+// TrySavePoint attempts to create a savepoint in a transaction. Returns an error if the database is not in a transaction.
 func TrySavePoint(ctx context.Context, db DB, name string, fn func() error) error {
 	if v, ok := db.(Tx); ok {
 		return SavePoint(ctx, v, name, fn)
@@ -213,7 +215,7 @@ func TrySavePoint(ctx context.Context, db DB, name string, fn func() error) erro
 
 var validSavePointName = regexp.MustCompile(`^[0-9a-zA-Z_]+$`)
 
-// SavePoint 在事务中创建保存点，并在fn执行成功后释放保存点，fn执行失败或panic时回滚到保存点
+// SavePoint creates a savepoint in a transaction and releases it after the function executes successfully. If the function fails or panics, it rolls back to the savepoint.
 func SavePoint(ctx context.Context, tx Tx, name string, fn func() error) (err error) {
 	if !validSavePointName.MatchString(name) {
 		return fmt.Errorf("invalid savepoint name: %s", name)
@@ -248,7 +250,7 @@ func SavePoint(ctx context.Context, tx Tx, name string, fn func() error) (err er
 	return fn()
 }
 
-// QueryBy 查询并使用回调函数处理游标
+// QueryBy executes a select query and processes the result set using the provided callback function.
 func QueryBy(ctx context.Context, db DB, stmt *goqu.SelectDataset, fn func(ctx context.Context, rows *sqlx.Rows) error) error {
 	query, args, err := stmt.ToSQL()
 	if err != nil {
@@ -275,9 +277,8 @@ func QueryBy(ctx context.Context, db DB, stmt *goqu.SelectDataset, fn func(ctx c
 	return rows.Err()
 }
 
-// NewUpsertRecord 构建upsert更新的记录
-//
-// 凡是refuse update的字段都不会被更新，如果需要更新其他字段，可以通过columns参数指定
+// NewUpsertRecord builds a record for upsert operations.
+// Fields marked as refuse update will not be updated. Use the columns parameter to update additional fields.
 func NewUpsertRecord(ent Entity, otherColumns ...string) goqu.Record {
 	md, err := getMetadata(ent)
 	if err != nil {
@@ -317,7 +318,7 @@ func NewUpsertTarget(ent Entity) string {
 	return strings.Join(target, ", ")
 }
 
-// Pagination 数据库分页计算
+// Pagination contains pagination calculation information for database queries.
 type Pagination struct {
 	First    int `json:"first"`
 	Last     int `json:"last"`
@@ -328,7 +329,7 @@ type Pagination struct {
 	Items    int `json:"items"`
 }
 
-// NewPagination 计算分页页码
+// NewPagination calculates and returns pagination information based on current page, page size, and total items.
 func NewPagination(current, size, items int) Pagination {
 	if current <= 0 {
 		current = 1
@@ -365,31 +366,30 @@ func NewPagination(current, size, items int) Pagination {
 	return p
 }
 
-// Limit 数据库查询LIMIT值
+// Limit returns the LIMIT value for database queries.
 func (p Pagination) Limit() int {
 	return p.Size
 }
 
-// ULimit 数据库查询LIMIT值
+// ULimit returns the LIMIT value as an unsigned integer for database queries.
 func (p Pagination) ULimit() uint {
 	return uint(p.Size)
 }
 
-// Offset 数据库查询OFFSET值
+// Offset returns the OFFSET value for database queries.
 func (p Pagination) Offset() int {
 	return (p.Current - 1) * p.Size
 }
 
-// UOffset 数据库查询OFFSET值
+// UOffset returns the OFFSET value as an unsigned integer for database queries.
 func (p Pagination) UOffset() uint {
 	return uint(p.Offset())
 }
 
-// IsNotFound 判断是否是未找到错误
-//
-// repository在没有找到记录时返回ErrNotFound错误
-// GetRecord()在没有找到记录时返回sql.ErrNoRows错误
-// 使用这个方法来统一处理错误判断
+// IsNotFound checks whether an error is a not found error.
+// Repository returns ErrNotFound when a record is not found.
+// GetRecord returns sql.ErrNoRows when a record is not found.
+// Use this function to unify error checking.
 func IsNotFound(err error) bool {
 	if err == nil {
 		return false

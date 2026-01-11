@@ -14,14 +14,14 @@ var (
 
 	_ entity.Cacher = &fakeCacher{}
 
-	// User可缓存断言
+	// User is a cacheable assertion.
 	_ entity.Cacheable = (*User)(nil)
-	// User是一个实体对象断言
+	// User is an entity object assertion.
 	_ entity.Entity = (*User)(nil)
 )
 
 // func init() {
-// 	// 设置entity模块读写超时时间，默认都是3秒
+// 	// Set the entity module read/write timeout (default is 3 seconds).
 // 	entity.ReadTimeout = 5 * time.Second
 // 	entity.WriteTimeout = 5 * time.Second
 // }
@@ -29,7 +29,7 @@ var (
 func main() {
 }
 
-// User 用户实体
+// User is a user entity.
 type User struct {
 	ID       int64 `db:"user_id,primaryKey,autoIncrement"`
 	CreateAt int64 `db:"create_at,refuseUpdate"`
@@ -37,12 +37,12 @@ type User struct {
 	Other    bool  `db:"-"`
 }
 
-// TableName 返回数据库表名，entity.Entity接口方法
+// TableName returns the database table name and implements the entity.Entity interface.
 func (u User) TableName() string {
 	return "users"
 }
 
-// OnEntityEvent 存储事件回调方法，entity.Entity接口方法
+// OnEntityEvent handles storage event callbacks and implements the entity.Entity interface.
 func (u *User) OnEntityEvent(ctx context.Context, ev entity.Event) error {
 	switch ev {
 	case entity.EventBeforeInsert:
@@ -54,7 +54,8 @@ func (u *User) OnEntityEvent(ctx context.Context, ev entity.Event) error {
 	return nil
 }
 
-// CacheOption 缓存配置，不实现这个方法就不会自动缓存，entity.Cacheable接口方法
+// CacheOption returns cache configuration and implements the entity.Cacheable interface.
+// Without implementing this method, automatic caching will not be enabled.
 func (u *User) CacheOption() entity.CacheOption {
 	return entity.CacheOption{
 		Key:        fmt.Sprintf(`user:entity:%d`, u.ID),
@@ -63,7 +64,7 @@ func (u *User) CacheOption() entity.CacheOption {
 	}
 }
 
-// FindUser 根据ID查询用户
+// FindUser retrieves a user by ID.
 func FindUser(ctx context.Context, id int64) (*User, error) {
 	u := &User{ID: id}
 	if err := entity.Load(ctx, u, defaultDB); err != nil {
@@ -72,12 +73,12 @@ func FindUser(ctx context.Context, id int64) (*User, error) {
 	return u, nil
 }
 
-// InsertUser 保存新用户
+// InsertUser saves a new user to the database.
 func InsertUser(ctx context.Context, u *User) error {
 	return insertUser(ctx, u, defaultDB)
 }
 
-// InsertUserTx 使用事务保存新用户
+// InsertUserTx saves a new user using a database transaction.
 func InsertUserTx(ctx context.Context, u *User, tx *sqlx.Tx) error {
 	return insertUser(ctx, u, tx)
 }
@@ -92,22 +93,22 @@ func insertUser(ctx context.Context, u *User, db entity.DB) error {
 	return nil
 }
 
-// UpdateUser 更新用户数据
+// UpdateUser updates an existing user in the database.
 func UpdateUser(ctx context.Context, u *User) error {
 	return entity.Update(ctx, u, defaultDB)
 }
 
-// UpdateUserTx 使用事务更新用户数据
+// UpdateUserTx updates an existing user using a database transaction.
 func UpdateUserTx(ctx context.Context, u *User, tx *sqlx.Tx) error {
 	return entity.Update(ctx, u, tx)
 }
 
-// DeleteUser 删除用户
+// DeleteUser deletes a user from the database.
 func DeleteUser(ctx context.Context, u *User) error {
 	return entity.Delete(ctx, u, defaultDB)
 }
 
-// DeleteUserTx 使用事务删除用户
+// DeleteUserTx deletes a user using a database transaction.
 func DeleteUserTx(ctx context.Context, u *User, tx *sqlx.Tx) error {
 	return entity.Delete(ctx, u, tx)
 }

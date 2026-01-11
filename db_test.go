@@ -167,7 +167,7 @@ func TestQuoteIdentifier(t *testing.T) {
 	}
 }
 
-// 把字段排序处理一下，否则生成的sql里面的字段每次都是随机排序的
+// Sort the fields so that the fields in the generated sql are not randomly sorted each time.
 func newTestMetadata(ent Entity) (*Metadata, error) {
 	md, err := NewMetadata(ent)
 	if err != nil {

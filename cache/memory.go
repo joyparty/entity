@@ -12,7 +12,7 @@ type memoryCache struct {
 	values *cache.Cache
 }
 
-// NewMemoryCache 内存缓存
+// NewMemoryCache creates a new in-memory cache instance.
 func NewMemoryCache() entity.Cacher {
 	return &memoryCache{
 		values: cache.New(5*time.Minute, 10*time.Minute),

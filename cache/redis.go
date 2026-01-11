@@ -13,7 +13,7 @@ type redisCache struct {
 	Redis redis.Cmdable
 }
 
-// NewRedisCache 使用redis缓存实体数据
+// NewRedisCache creates a Redis-backed cache instance for entity data.
 func NewRedisCache(client redis.Cmdable) entity.Cacher {
 	return &redisCache{Redis: client}
 }
