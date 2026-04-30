@@ -196,6 +196,12 @@ type PersistentObject[ID comparable, DO any] interface {
 	ToDomainObject() (DO, error)
 }
 
+// Validator is an interface for domain objects that can validate themselves.
+// If a domain object implements this interface, DomainObjectRepository will call Validate() before write operations.
+type Validator interface {
+	Validate() error
+}
+
 // DomainObjectRepository is a repository for domain objects.
 //
 // Note: Some methods accept *goqu.SelectDataset parameters, which exposes technical implementation details
@@ -235,6 +241,10 @@ func (r *DomainObjectRepository[ID, DO, PO]) Find(ctx context.Context, id ID) (D
 
 // Create saves a new domain object to the database.
 func (r *DomainObjectRepository[ID, DO, PO]) Create(ctx context.Context, do DO) error {
+	if err := validate(do); err != nil {
+		return fmt.Errorf("validate, %w", err)
+	}
+
 	po, err := r.NewPersistentObject(ctx, do)
 	if err != nil {
 		return fmt.Errorf("new persistent object, %w", err)
@@ -245,6 +255,10 @@ func (r *DomainObjectRepository[ID, DO, PO]) Create(ctx context.Context, do DO) 
 
 // Update updates an existing domain object in the database.
 func (r *DomainObjectRepository[ID, DO, PO]) Update(ctx context.Context, do DO) error {
+	if err := validate(do); err != nil {
+		return fmt.Errorf("validate, %w", err)
+	}
+
 	po, err := r.NewPersistentObject(ctx, do)
 	if err != nil {
 		return fmt.Errorf("new persistent object, %w", err)
@@ -266,6 +280,8 @@ func (r *DomainObjectRepository[ID, DO, PO]) UpdateBy(ctx context.Context, id ID
 			return false, fmt.Errorf("convert to domain object, %w", err)
 		} else if ok, err := apply(v); err != nil || !ok {
 			return false, err
+		} else if err := validate(v); err != nil {
+			return false, fmt.Errorf("validate, %w", err)
 		} else if err := po.Set(ctx, v); err != nil {
 			return false, fmt.Errorf("set persistent object, %w", err)
 		}
@@ -287,6 +303,8 @@ func (r *DomainObjectRepository[ID, DO, PO]) UpdateByQuery(ctx context.Context, 
 			return false, fmt.Errorf("convert to domain object, %w", err)
 		} else if ok, err := apply(v); err != nil || !ok {
 			return false, err
+		} else if err := validate(v); err != nil {
+			return false, fmt.Errorf("validate, %w", err)
 		} else if err := po.Set(ctx, v); err != nil {
 			return false, fmt.Errorf("set persistent object, %w", err)
 		}
@@ -297,6 +315,10 @@ func (r *DomainObjectRepository[ID, DO, PO]) UpdateByQuery(ctx context.Context, 
 
 // Upsert inserts a new domain object or updates an existing one.
 func (r *DomainObjectRepository[ID, DO, PO]) Upsert(ctx context.Context, do DO) error {
+	if err := validate(do); err != nil {
+		return fmt.Errorf("validate, %w", err)
+	}
+
 	po, err := r.NewPersistentObject(ctx, do)
 	if err != nil {
 		return fmt.Errorf("new persistent object, %w", err)
@@ -388,4 +410,12 @@ func (r *DomainObjectRepository[ID, DO, PO]) ToDomainObjects(src []PO) ([]DO, er
 func (r *DomainObjectRepository[ID, DO, PO]) NewPersistentObject(ctx context.Context, do DO) (PO, error) {
 	po := reflect.New(r.poType).Interface().(PO)
 	return po, po.Set(ctx, do)
+}
+
+// validate calls Validate() on the domain object if it implements the Validator interface.
+func validate(do any) error {
+	if v, ok := do.(Validator); ok {
+		return v.Validate()
+	}
+	return nil
 }
