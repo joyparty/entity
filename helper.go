@@ -288,12 +288,12 @@ func NewUpsertRecord(ent Entity, otherColumns ...string) goqu.Record {
 	record := goqu.Record{}
 	for _, col := range md.Columns {
 		if !col.RefuseUpdate {
-			record[col.DBField] = goqu.I(fmt.Sprintf("EXCLUDED.%s", col.DBField))
+			record[col.DBField] = goqu.L("EXCLUDED.?", goqu.C(col.DBField))
 		}
 	}
 
 	for _, col := range otherColumns {
-		record[col] = goqu.I(fmt.Sprintf("EXCLUDED.%s", col))
+		record[col] = goqu.L("EXCLUDED.?", goqu.C(col))
 	}
 
 	return record
